@@ -11,6 +11,30 @@ const MACHINE_ORDER = ["macerator", "washer", "chembath", "thermal", "sifter", "
 
 const oreMeta = new Map(DEFAULT_ORES.map(o => [o.en, o]));
 
+// Human-readable names where GT's display name differs from a plain
+// camelCase split of the oredict name.
+const DISPLAY_OVERRIDES = {
+  GarnetRed: "Red Garnet",
+  GarnetYellow: "Yellow Garnet",
+  Cooperite: "Sheldonite",
+  LanthaniteLa: "Lanthanite (La)",
+  HeeEndium: "Endium (HEE)",
+  HeeEndPowder: "End Powder (HEE)",
+  HeeIgneousRock: "Igneous Rock (HEE)",
+  HeeStardust: "Stardust (HEE)",
+  HeeInstabilityOrb: "Instability Orb (HEE)",
+  Debris: "Ancient Debris",
+  Oilsands: "Oil Sands",
+  BArTiMaEuSNeK: "",
+  TricalciumPhosphate: "Tricalcium Phosphate (Apatite)",
+};
+
+function displayName(en) {
+  if (en in DISPLAY_OVERRIDES) return DISPLAY_OVERRIDES[en];
+  const spaced = en.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return spaced === en ? "" : spaced;
+}
+
 const state = {
   commonRoute: "MMC",
   ores: DEFAULT_ORES.map(o => ({ en: o.en, route: o.route })),
@@ -91,7 +115,7 @@ function renderOreGrid() {
         : el("div", { class: "ore-icon" }),
       el("div", { class: "ore-names" },
         el("div", { class: "ore-en", title: ore.en }, ore.en),
-        el("div", { class: "ore-zh" }, meta?.zh && meta.zh !== ore.en ? meta.zh : " "),
+        el("div", { class: "ore-sub" }, displayName(ore.en) || " "),
       ),
       el("button", {
         class: "ore-remove", title: "Remove " + ore.en,
