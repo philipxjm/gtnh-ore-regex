@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GTNH Ore Processing Regex Generator</title>
+<meta name="description" content="Generate ore dictionary filter regexes for GregTech: New Horizons ore processing lines. English reimplementation of the GTNH Chinese wiki tool.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="icons/machine_macerator.png">
+</head>
+<body>
+<div class="rivets" aria-hidden="true"></div>
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <img src="icons/machine_macerator.png" alt="" class="brand-icon">
+      <div>
+        <h1>Ore Processing <span>Regex Generator</span></h1>
+        <p class="tagline">GregTech: New Horizons &middot; ore dictionary filters for your sorting line</p>
+      </div>
+    </div>
+    <div class="masthead-actions">
+      <div class="mode-switch" role="tablist" aria-label="Machine mode">
+        <button id="mode-regular" class="mode-btn is-active" role="tab">Multiblock line</button>
+        <button id="mode-iof" class="mode-btn" role="tab">Integrated Ore Factory</button>
+      </div>
+      <button id="share-btn" class="action-btn" title="Copy a shareable link encoding this configuration">Copy config link</button>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="config-col">
+    <section class="panel" id="common-panel">
+      <h2 class="panel-title">Common logic <span class="panel-sub">default route for every ore not listed below</span></h2>
+      <div class="route-picker" id="route-picker"></div>
+    </section>
+
+    <section class="panel" id="special-panel">
+      <h2 class="panel-title">Special ores <span class="panel-sub">overrides — these ores take their own route</span></h2>
+      <div class="toolbar">
+        <div class="add-row">
+          <input id="add-input" list="ore-names" placeholder="Add ore by oredict material name&hellip;" autocomplete="off">
+          <datalist id="ore-names"></datalist>
+          <select id="add-route"></select>
+          <button id="add-btn" class="action-btn">Add</button>
+        </div>
+        <div class="tool-row">
+          <span class="sort-label">Sort:</span>
+          <button class="chip-btn sort-btn is-active" data-sort="route">by route</button>
+          <button class="chip-btn sort-btn" data-sort="name">by name</button>
+          <span class="tool-spacer"></span>
+          <button id="defaults-btn" class="chip-btn">Restore defaults</button>
+          <button id="clear-btn" class="chip-btn chip-danger">Remove all</button>
+        </div>
+      </div>
+      <div class="ore-grid" id="ore-grid"></div>
+    </section>
+
+    <section class="panel about">
+      <h2 class="panel-title">How to use</h2>
+      <ol>
+        <li>Pick the <strong>common logic</strong> — the processing route ordinary ores take. Ores in the special list follow their own route instead.</li>
+        <li>Paste each machine's regex into the filter feeding that machine: a GregTech <strong>Ore Dictionary Filter</strong> cover, or an ME storage bus / interface with an oredict filter. The <strong>1024-character counter</strong> matches the filter cover's limit.</li>
+        <li>Hover a route to see its chain. Item forms flow <em>ore → crushed → purified / centrifuged → impure / purified dust → dust</em>; every regex targets the oredict names of exactly those intermediate forms.</li>
+      </ol>
+      <p class="fine">Faithful English reimplementation of the <a href="https://gtnh.huijiwiki.com/wiki/%E7%9F%BF%E7%89%A9%E5%A4%84%E7%90%86%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E7%94%9F%E6%88%90%E5%99%A8" rel="noopener">GTNH Chinese wiki generator</a> — config links from that tool open here unchanged. Material namespace derived from GT5U <code>5.09.52.594</code> sources (GregTech + BartWorks + GT++ + GTNH-Lanthanides); a few abbreviations are one or two characters longer than the original because this namespace includes ore materials the original omits, which makes the filters strictly safer. Validated semantically against the original's output.</p>
+      </section>
+  </section>
+
+  <section class="output-col" id="output-col"></section>
+</main>
+
+<footer class="footer">
+  <p>Not affiliated with the GTNH team or the huijiwiki community &middot; icons &copy; their respective mods &middot; <a id="repo-link" href="https://github.com/philipxjm/gtnh-ore-regex" rel="noopener">source on GitHub</a></p>
+</footer>
+
+<div id="toast" class="toast" role="status"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
