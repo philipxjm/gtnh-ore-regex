@@ -5,8 +5,8 @@ import {
 } from "./generator.js";
 
 const CHAR_LIMIT = 1024;
-const COMMON_CHOICES = ["MPMC", "MMC", "MHW", "HHW"];
-const ROUTE_OPTIONS = ["common", "MPMC", "MMC", "MHW", "HHW", "MPS", "MTM", "MPTM", "MBMC", "MBTM", "M", "H", "MM", "MP", "None"];
+const COMMON_CHOICES = ["MPTM", "MPMC", "MMC", "MHW", "HHW"];
+const ROUTE_OPTIONS = ["common", "MPTM", "MPMC", "MMC", "MHW", "HHW", "MPS", "MTM", "MBMC", "MBTM", "M", "H", "MM", "MP", "None"];
 const MACHINE_ORDER = ["macerator", "washer", "chembath", "thermal", "sifter", "centrifuge", "hammer", "simplewasher"];
 
 const oreMeta = new Map(DEFAULT_ORES.map(o => [o.en, o]));

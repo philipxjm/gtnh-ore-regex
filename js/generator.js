@@ -36,11 +36,12 @@ export const MACHINES = {
 //   C centrifuge: dustImpure|dustPure->dust       S sift: crushedPurified->gems
 //   H hammer:   ore->crushed, crushed->dustImpure W simple-wash: dustImpure->dust
 export const ROUTES = {
+  MPTM: { note: "Full line: washer + thermal byproducts · slowest" },
   MPMC: { note: "Most byproducts · slow" },
   MMC: { note: "Moderate byproducts · moderate speed" },
   MHW: { note: "Fewest byproducts · fast" },
   HHW: { note: "Halved main output · no byproducts · fastest" },
-  MPS: {}, MTM: {}, MPTM: {}, MBMC: {}, MBTM: {},
+  MPS: {}, MTM: {}, MBMC: {}, MBTM: {},
   M: {}, H: {}, MM: {}, MP: {}, None: {}, common: {},
 };
 
