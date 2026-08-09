@@ -42,7 +42,37 @@ const state = {
   sort: "route",
   strayIntermediates: true,
   decompMode: "safe", // off | safe | all
+  decompExtra: { electrolyzer: [], centrifuge_decomp: [] },
+  decompRemoved: { electrolyzer: [], centrifuge_decomp: [] },
 };
+
+const DECOMP_STORE_KEY = "gtnh-ore-regex.decomp-custom.v1";
+try {
+  const saved = JSON.parse(localStorage.getItem(DECOMP_STORE_KEY) || "null");
+  if (saved) {
+    state.decompExtra = saved.extra ?? state.decompExtra;
+    state.decompRemoved = saved.removed ?? state.decompRemoved;
+    if (saved.mode) state.decompMode = saved.mode;
+  }
+} catch { /* ignore corrupt storage */ }
+
+function saveDecompCustom() {
+  localStorage.setItem(DECOMP_STORE_KEY, JSON.stringify({
+    extra: state.decompExtra, removed: state.decompRemoved, mode: state.decompMode,
+  }));
+}
+
+const DECOMP_BASE = {
+  electrolyzer: { safe: DECOMP_ELECTROLYZER_SAFE, all: DECOMP_ELECTROLYZER },
+  centrifuge_decomp: { safe: DECOMP_CENTRIFUGE_SAFE, all: DECOMP_CENTRIFUGE },
+};
+
+function effectiveDecompList(machine) {
+  const base = DECOMP_BASE[machine][state.decompMode === "all" ? "all" : "safe"];
+  const set = new Set([...base, ...state.decompExtra[machine]]);
+  for (const r of state.decompRemoved[machine]) set.delete(r);
+  return [...set];
+}
 
 // ---------- fragment sync ----------
 
@@ -204,11 +234,9 @@ function renderOutputs() {
       }, config));
     }
     if (state.decompMode !== "off") {
-      const eList = state.decompMode === "all" ? DECOMP_ELECTROLYZER : DECOMP_ELECTROLYZER_SAFE;
-      const cList = state.decompMode === "all" ? DECOMP_CENTRIFUGE : DECOMP_CENTRIFUGE_SAFE;
       const decompCards = [
-        ...generateDecomposition(eList, "electrolyzer", DUST_NAMESPACE),
-        ...generateDecomposition(cList, "centrifuge_decomp", DUST_NAMESPACE),
+        ...generateDecomposition(effectiveDecompList("electrolyzer"), "electrolyzer", DUST_NAMESPACE),
+        ...generateDecomposition(effectiveDecompList("centrifuge_decomp"), "centrifuge_decomp", DUST_NAMESPACE),
       ];
       for (const card of decompCards) {
         const m = MACHINES[card.machine];
@@ -319,8 +347,46 @@ $("#stray-toggle").addEventListener("change", (e) => {
 
 $("#decomp-mode").addEventListener("change", (e) => {
   state.decompMode = e.target.value;
+  saveDecompCustom();
+  renderDecompCustom();
   renderOutputs();
 });
+
+function renderDecompCustom() {
+  const host = $("#decomp-custom");
+  if (state.decompMode === "off") { host.replaceChildren(); return; }
+  const sections = [];
+  for (const [machine, label] of [["electrolyzer", "Electrolyzer"], ["centrifuge_decomp", "Centrifuge"]]) {
+    const current = effectiveDecompList(machine).sort();
+    const candidates = DECOMP_BASE[machine].all.filter(n => !current.includes(n));
+    const chips = current.map(name => el("span", { class: "decomp-chip", title: "Click to remove" },
+      name,
+      el("button", {
+        class: "decomp-chip-x",
+        onclick: () => {
+          state.decompExtra[machine] = state.decompExtra[machine].filter(n => n !== name);
+          if (!state.decompRemoved[machine].includes(name)) state.decompRemoved[machine].push(name);
+          saveDecompCustom(); renderDecompCustom(); renderOutputs();
+        },
+      }, "\u00d7")));
+    const listId = "decomp-add-" + machine;
+    const input = el("input", { list: listId, placeholder: "Add material\u2026", class: "decomp-add" });
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      const name = input.value.trim();
+      if (!DECOMP_BASE[machine].all.includes(name)) { toast(name + " has no " + label.toLowerCase() + " decomposition recipe"); return; }
+      state.decompRemoved[machine] = state.decompRemoved[machine].filter(n => n !== name);
+      if (!effectiveDecompList(machine).includes(name)) state.decompExtra[machine].push(name);
+      input.value = "";
+      saveDecompCustom(); renderDecompCustom(); renderOutputs();
+    });
+    sections.push(el("div", { class: "decomp-section" },
+      el("div", { class: "decomp-label" }, label + " (" + current.length + "):"),
+      el("div", { class: "decomp-chips" }, ...chips,
+        input, el("datalist", { id: listId }, ...candidates.map(n => el("option", { value: n }))))));
+  }
+  host.replaceChildren(...sections);
+}
 
 $("#defaults-btn").addEventListener("click", () => {
   state.commonRoute = "MMC";
@@ -336,3 +402,4 @@ $("#clear-btn").addEventListener("click", () => {
 
 loadFromFragment();
 update();
+renderDecompCustom();
