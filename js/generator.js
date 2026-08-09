@@ -157,9 +157,21 @@ function segmentRegex(seg, namespace) {
 
 const FORM_ORDER = ["oreRaw", "crushed", "crushedPurified", "crushedCentrifuged", "dustImpure", "dustPure"];
 
+// GT-semantics continuation for intermediate forms the common route does not
+// itself produce (bee products, manual inserts): macerate any crushed form,
+// centrifuge any dust form.
+const STRAY_CONTINUATION = {
+  crushed: "macerator",
+  crushedPurified: "macerator",
+  crushedCentrifuged: "macerator",
+  dustImpure: "centrifuge",
+  dustPure: "centrifuge",
+};
+
 // config: { commonRoute, ores: [{en, route}, ...] }  (route may be "common")
+// opts.strayIntermediates: also route stray intermediate forms via common logic.
 // Returns [{machine, segments:[{form, common, only?, exclGroups?, regex}], regex, length}]
-export function generate(config, namespace) {
+export function generate(config, namespace, opts = {}) {
   const { commonRoute, ores } = config;
   const resolved = ores.map(o => ({ en: o.en, route: o.route === "common" ? commonRoute : o.route, explicit: o.route }));
 
@@ -179,6 +191,15 @@ export function generate(config, namespace) {
 
   const commonSteps = routeSteps(commonRoute);
   for (const s of commonSteps) touch(s.machine, s.form).commonHere = true;
+
+  if (opts.strayIntermediates) {
+    // Only add a continuation for forms the common route leaves unconsumed;
+    // where the route already eats a form, its own machine keeps authority.
+    for (const [form, machine] of Object.entries(STRAY_CONTINUATION)) {
+      const consumed = commonSteps.some((s) => s.form === form);
+      if (!consumed) touch(machine, form).commonHere = true;
+    }
+  }
 
   for (const ore of resolved) {
     if (ore.explicit === "common" || ore.explicit === "None") continue;

@@ -40,6 +40,7 @@ const state = {
   ores: DEFAULT_ORES.map(o => ({ en: o.en, route: o.route })),
   mode: "regular",
   sort: "route",
+  strayIntermediates: true,
 };
 
 // ---------- fragment sync ----------
@@ -188,7 +189,7 @@ function renderOutputs() {
   const cards = [];
 
   if (state.mode === "regular") {
-    const generated = generate(config, NAMESPACE);
+    const generated = generate(config, NAMESPACE, { strayIntermediates: state.strayIntermediates });
     generated.sort((a, b) => MACHINE_ORDER.indexOf(a.machine) - MACHINE_ORDER.indexOf(b.machine));
     for (const card of generated) {
       const m = MACHINES[card.machine];
@@ -290,6 +291,11 @@ for (const btn of document.querySelectorAll(".sort-btn")) {
     renderOreGrid();
   });
 }
+
+$("#stray-toggle").addEventListener("change", (e) => {
+  state.strayIntermediates = e.target.checked;
+  renderOutputs();
+});
 
 $("#defaults-btn").addEventListener("click", () => {
   state.commonRoute = "MMC";

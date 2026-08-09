@@ -37,6 +37,10 @@
     <section class="panel" id="common-panel">
       <h2 class="panel-title">Common logic <span class="panel-sub">default route for every ore not listed below</span></h2>
       <div class="route-picker" id="route-picker"></div>
+      <label class="stray-row" title="Also match intermediate forms the common route would not itself produce (crushedPurified / crushedCentrifuged / dustPure of common ores) and continue them toward dust: macerate crushed forms, centrifuge dusts. Catches bee products and manually inserted intermediates that would otherwise strand in storage.">
+        <input type="checkbox" id="stray-toggle" checked>
+        Route stray intermediates (bee products, manual inserts)
+      </label>
     </section>
 
     <section class="panel" id="special-panel">

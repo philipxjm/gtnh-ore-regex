@@ -382,3 +382,11 @@ code { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; color: var(--
 .toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 ::selection { background: rgba(255, 176, 0, 0.3); }
+
+.stray-row {
+  display: flex; gap: 8px; align-items: center;
+  margin-top: 12px; font-size: 0.83rem; color: var(--text-dim);
+  cursor: pointer;
+}
+.stray-row input { accent-color: var(--amber); }
+.stray-row:hover { color: var(--text); }

@@ -28,6 +28,13 @@ Material names are abbreviated to the **shortest prefix unique within the full G
 a name that is a strict prefix of another (Quartz, Tin, Platinum, Iridium, Cassiterite, ...) is emitted as an exact
 alternative instead of a prefix wildcard.
 
+**Stray intermediates**: by default the generator also routes intermediate forms
+the common route would not itself produce — `crushedPurified`/`crushedCentrifuged`/
+`dustPure` of common-logic ores, as made by bees or inserted by hand — continuing
+them toward dust (macerate crushed forms, centrifuge dusts). Specials keep their
+configured routes. Untick the option for byte-compatibility with the original
+tool's output.
+
 The **Integrated Ore Factory** mode emits one regex per IOF processing mode instead (matching `ore`/`rawOre` only,
 since the IOF runs the whole chain internally), with mode numbers matching the machine's screwdriver cycle.
 
