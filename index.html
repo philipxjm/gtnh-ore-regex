@@ -41,9 +41,13 @@
         <input type="checkbox" id="stray-toggle" checked>
         Route stray intermediates (bee products, manual inserts)
       </label>
-      <label class="stray-row" title="Adds Electrolyzer and Centrifuge cards matching final dusts of compound ore materials that decompose (from GT5U recipe data: 53 electrolyzable like Bauxite, 31 centrifuge-decomposable like Cinnabar). Route these dusts onward instead of storing them.">
-        <input type="checkbox" id="decomp-toggle" checked>
-        Decompose compound dusts (Electrolyzer / Centrifuge)
+      <label class="stray-row" title="Adds Electrolyzer and Centrifuge cards for compound ore dusts. Conservative: only the 16 dusts with no other recipe uses anywhere (safe to always decompose). Everything: all 84 dusts that have a decomposition recipe — including chain feedstocks like Bauxite and Apatite that you may want to keep.">
+        Decompose compound dusts:
+        <select id="decomp-mode" class="ore-route" style="width:auto">
+          <option value="off">Off</option>
+          <option value="safe" selected>Conservative (16 decompose-only dusts)</option>
+          <option value="all">Everything with a recipe (84)</option>
+        </select>
       </label>
     </section>
 

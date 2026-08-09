@@ -1,4 +1,4 @@
-import { NAMESPACE, DEFAULT_ORES, DECOMP_ELECTROLYZER, DECOMP_CENTRIFUGE, DUST_NAMESPACE } from "./data.js";
+import { NAMESPACE, DEFAULT_ORES, DECOMP_ELECTROLYZER, DECOMP_CENTRIFUGE, DECOMP_ELECTROLYZER_SAFE, DECOMP_CENTRIFUGE_SAFE, DUST_NAMESPACE } from "./data.js";
 import {
   MACHINES, ROUTES, routeLabel, generate, generateIOF, generateDecomposition,
   encodeFragment, decodeFragment,
@@ -41,7 +41,7 @@ const state = {
   mode: "regular",
   sort: "route",
   strayIntermediates: true,
-  decomposeDusts: true,
+  decompMode: "safe", // off | safe | all
 };
 
 // ---------- fragment sync ----------
@@ -203,10 +203,12 @@ function renderOutputs() {
         segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
       }, config));
     }
-    if (state.decomposeDusts) {
+    if (state.decompMode !== "off") {
+      const eList = state.decompMode === "all" ? DECOMP_ELECTROLYZER : DECOMP_ELECTROLYZER_SAFE;
+      const cList = state.decompMode === "all" ? DECOMP_CENTRIFUGE : DECOMP_CENTRIFUGE_SAFE;
       const decompCards = [
-        ...generateDecomposition(DECOMP_ELECTROLYZER, "electrolyzer", DUST_NAMESPACE),
-        ...generateDecomposition(DECOMP_CENTRIFUGE, "centrifuge_decomp", DUST_NAMESPACE),
+        ...generateDecomposition(eList, "electrolyzer", DUST_NAMESPACE),
+        ...generateDecomposition(cList, "centrifuge_decomp", DUST_NAMESPACE),
       ];
       for (const card of decompCards) {
         const m = MACHINES[card.machine];
@@ -315,8 +317,8 @@ $("#stray-toggle").addEventListener("change", (e) => {
   renderOutputs();
 });
 
-$("#decomp-toggle").addEventListener("change", (e) => {
-  state.decomposeDusts = e.target.checked;
+$("#decomp-mode").addEventListener("change", (e) => {
+  state.decompMode = e.target.value;
   renderOutputs();
 });
 
