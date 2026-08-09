@@ -1,6 +1,6 @@
-import { NAMESPACE, DEFAULT_ORES } from "./data.js";
+import { NAMESPACE, DEFAULT_ORES, DECOMP_ELECTROLYZER, DECOMP_CENTRIFUGE, DUST_NAMESPACE } from "./data.js";
 import {
-  MACHINES, ROUTES, routeLabel, generate, generateIOF,
+  MACHINES, ROUTES, routeLabel, generate, generateIOF, generateDecomposition,
   encodeFragment, decodeFragment,
 } from "./generator.js";
 
@@ -41,6 +41,7 @@ const state = {
   mode: "regular",
   sort: "route",
   strayIntermediates: true,
+  decomposeDusts: true,
 };
 
 // ---------- fragment sync ----------
@@ -128,6 +129,9 @@ function renderOreGrid() {
 }
 
 function formatOreList(names) {
+  if (names.length > 16) {
+    return names.slice(0, 16).join(", ") + ` \u2026 +${names.length - 16} more`;
+  }
   return names.join(", ");
 }
 
@@ -181,6 +185,7 @@ function machineCard({ title, sub, icon, regex, segments, modeTag }, config) {
 const FORM_LABELS = {
   oreRaw: "ore / rawOre", crushed: "crushed", crushedPurified: "crushedPurified",
   crushedCentrifuged: "crushedCentrifuged", dustImpure: "dustImpure", dustPure: "dustPure",
+  dust: "dust",
 };
 
 function renderOutputs() {
@@ -197,6 +202,19 @@ function renderOutputs() {
         title: m.label, sub: m.multi, icon: m.icon, regex: card.regex,
         segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
       }, config));
+    }
+    if (state.decomposeDusts) {
+      const decompCards = [
+        ...generateDecomposition(DECOMP_ELECTROLYZER, "electrolyzer", DUST_NAMESPACE),
+        ...generateDecomposition(DECOMP_CENTRIFUGE, "centrifuge_decomp", DUST_NAMESPACE),
+      ];
+      for (const card of decompCards) {
+        const m = MACHINES[card.machine];
+        cards.push(machineCard({
+          title: m.label, sub: m.multi, icon: m.icon, regex: card.regex,
+          segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
+        }, config));
+      }
     }
   } else {
     const { cards: iofCards, unsupported } = generateIOF(config, NAMESPACE);
@@ -294,6 +312,11 @@ for (const btn of document.querySelectorAll(".sort-btn")) {
 
 $("#stray-toggle").addEventListener("change", (e) => {
   state.strayIntermediates = e.target.checked;
+  renderOutputs();
+});
+
+$("#decomp-toggle").addEventListener("change", (e) => {
+  state.decomposeDusts = e.target.checked;
   renderOutputs();
 });
 

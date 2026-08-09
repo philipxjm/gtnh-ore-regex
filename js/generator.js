@@ -14,6 +14,7 @@ export const FORMS = {
   crushedCentrifuged: { re: "crushedCentrifuged", label: "Centrifuged Ore" },
   dustImpure: { re: "dustImpure", label: "Impure Dust" },
   dustPure: { re: "dustPure", label: "Purified Dust" },
+  dust: { re: "dust", label: "Dust", guard: "(?!Impure|Pure|Small|Tiny)" },
 };
 
 export const MACHINES = {
@@ -25,6 +26,8 @@ export const MACHINES = {
   centrifuge: { label: "Centrifuge", multi: "Industrial Centrifuge", icon: "machine_centrifuge.png" },
   hammer: { label: "Forge Hammer", multi: "Forge Hammer", icon: "machine_macerator.png" },
   simplewasher: { label: "Simple Washer", multi: "Simple Washer", icon: "machine_washer.png" },
+  electrolyzer: { label: "Electrolyzer", multi: "Compound dust decomposition", icon: "machine_chembath.png" },
+  centrifuge_decomp: { label: "Centrifuge (decomposition)", multi: "Compound dust decomposition", icon: "machine_centrifuge.png" },
 };
 
 // Route code -> ordered (machine, input form) steps. Derived by tracking the
@@ -273,6 +276,36 @@ export function generateIOF(config, namespace) {
     cards.push({ machine: "iof", mode: IOF_MODES[route], route, segments: [seg], regex: seg.regex, length: seg.regex.length });
   }
   return { cards, unsupported };
+}
+
+// ---- Compound-dust decomposition cards ----
+// One card per decomposition machine matching final dusts of compound ore
+// materials. Splits into multiple regexes when over the filter length limit.
+export function generateDecomposition(materials, machine, dustNamespace, limit = 1024) {
+  const sorted = [...materials].sort((a, b) =>
+    a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0);
+  const cards = [];
+  let batch = [];
+  const build = (names) => {
+    const seg = { form: "dust", common: false, only: names };
+    seg.regex = segmentRegex(seg, dustNamespace);
+    return seg;
+  };
+  for (const name of sorted) {
+    const trial = build([...batch, name]);
+    if (trial.regex.length > limit && batch.length > 0) {
+      const seg = build(batch);
+      cards.push({ machine, segments: [seg], regex: seg.regex, length: seg.regex.length });
+      batch = [name];
+    } else {
+      batch = [...batch, name];
+    }
+  }
+  if (batch.length) {
+    const seg = build(batch);
+    cards.push({ machine, segments: [seg], regex: seg.regex, length: seg.regex.length });
+  }
+  return cards;
 }
 
 // ---- URL fragment (de)serialization, compatible with the huijiwiki tool ----
