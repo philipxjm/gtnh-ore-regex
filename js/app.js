@@ -42,6 +42,7 @@ const state = {
   sort: "route",
   strayIntermediates: true,
   decompMode: "safe", // off | safe | all
+  combineCentrifuge: true,
   decompExtra: { electrolyzer: [], centrifuge_decomp: [] },
   decompRemoved: { electrolyzer: [], centrifuge_decomp: [] },
 };
@@ -53,12 +54,14 @@ try {
     state.decompExtra = saved.extra ?? state.decompExtra;
     state.decompRemoved = saved.removed ?? state.decompRemoved;
     if (saved.mode) state.decompMode = saved.mode;
+    if (typeof saved.combine === "boolean") state.combineCentrifuge = saved.combine;
   }
 } catch { /* ignore corrupt storage */ }
 
 function saveDecompCustom() {
   localStorage.setItem(DECOMP_STORE_KEY, JSON.stringify({
     extra: state.decompExtra, removed: state.decompRemoved, mode: state.decompMode,
+    combine: state.combineCentrifuge,
   }));
 }
 
@@ -223,28 +226,36 @@ function renderOutputs() {
   const config = { commonRoute: state.commonRoute, ores: state.ores };
   const cards = [];
 
+  const push = card => {
+    const m = MACHINES[card.machine];
+    cards.push(machineCard({
+      title: m.label, icon: m.icon, regex: card.regex,
+      sub: card.merged ? m.multi + " · also decomposes compound dusts" : m.multi,
+      segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
+    }, config));
+  };
+
   if (state.mode === "regular") {
     const generated = generate(config, NAMESPACE, { strayIntermediates: state.strayIntermediates });
     generated.sort((a, b) => MACHINE_ORDER.indexOf(a.machine) - MACHINE_ORDER.indexOf(b.machine));
-    for (const card of generated) {
-      const m = MACHINES[card.machine];
-      cards.push(machineCard({
-        title: m.label, sub: m.multi, icon: m.icon, regex: card.regex,
-        segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
-      }, config));
-    }
+
+    // Decomposition runs on the same physical centrifuge as the ore line's, so
+    // one filter can drive both: fold the dust segment into that card and let
+    // whatever no longer fits spill into decomposition-only cards. With no
+    // centrifuge step in the routes there is nothing to merge into, and the
+    // decomposition cards stand alone as before.
+    const centDusts = state.decompMode === "off" ? [] : effectiveDecompList("centrifuge_decomp");
+    const host = state.combineCentrifuge && centDusts.length
+      ? generated.find(c => c.machine === "centrifuge")
+      : null;
+    const centCards = centDusts.length
+      ? generateDecomposition(centDusts, "centrifuge_decomp", DUST_NAMESPACE, CHAR_LIMIT, host)
+      : [];
+
+    for (const card of generated) push(host && card === host ? centCards[0] : card);
     if (state.decompMode !== "off") {
-      const decompCards = [
-        ...generateDecomposition(effectiveDecompList("electrolyzer"), "electrolyzer", DUST_NAMESPACE),
-        ...generateDecomposition(effectiveDecompList("centrifuge_decomp"), "centrifuge_decomp", DUST_NAMESPACE),
-      ];
-      for (const card of decompCards) {
-        const m = MACHINES[card.machine];
-        cards.push(machineCard({
-          title: m.label, sub: m.multi, icon: m.icon, regex: card.regex,
-          segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
-        }, config));
-      }
+      for (const card of generateDecomposition(effectiveDecompList("electrolyzer"), "electrolyzer", DUST_NAMESPACE)) push(card);
+      for (const card of host ? centCards.slice(1) : centCards) push(card);
     }
   } else {
     const { cards: iofCards, unsupported } = generateIOF(config, NAMESPACE);
@@ -352,8 +363,17 @@ $("#decomp-mode").addEventListener("change", (e) => {
   renderOutputs();
 });
 
+$("#combine-toggle").addEventListener("change", (e) => {
+  state.combineCentrifuge = e.target.checked;
+  saveDecompCustom();
+  renderOutputs();
+});
+
 function renderDecompCustom() {
   const host = $("#decomp-custom");
+  $("#decomp-mode").value = state.decompMode;
+  $("#combine-row").hidden = state.decompMode === "off";
+  $("#combine-toggle").checked = state.combineCentrifuge;
   if (state.decompMode === "off") { host.replaceChildren(); return; }
   const sections = [];
   for (const [machine, label] of [["electrolyzer", "Electrolyzer"], ["centrifuge_decomp", "Centrifuge"]]) {

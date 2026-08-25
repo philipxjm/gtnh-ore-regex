@@ -35,6 +35,22 @@ them toward dust (macerate crushed forms, centrifuge dusts). Specials keep their
 configured routes. Untick the option for byte-compatibility with the original
 tool's output.
 
+**Compound-dust decomposition**: optional extra cards matching the *final* dusts
+that break down further, for the Electrolyzer and the Centrifuge. Conservative
+mode lists only the dusts with no other recipe use anywhere; Everything lists all
+84 with a decomposition recipe, including chain feedstocks like Bauxite and
+Apatite you may well want to keep whole. Either list is editable per machine.
+
+Decomposition is not a separate machine from the ore line's centrifuge step, so
+by default the compound dusts are **merged into the Centrifuge card** rather than
+given one of their own — one filter, both jobs. What makes that safe is the dust
+form's guard: `^dust(?!Impure|Pure|Small|Tiny)(?:…)$` cannot swallow the
+`dustImpure`/`dustPure` inputs sharing the regex with it. The merged card is
+built against the same 1024-character budget as any other, minus what the ore
+segments already spend; dusts that no longer fit spill into decomposition-only
+cards. Untick the merge to drive a dedicated decomposition line instead. Routes
+with no centrifuge step have nothing to merge into and always get their own card.
+
 The **Integrated Ore Factory** mode emits one regex per IOF processing mode instead (matching `ore`/`rawOre` only,
 since the IOF runs the whole chain internally), with mode numbers matching the machine's screwdriver cycle.
 

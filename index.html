@@ -49,6 +49,10 @@
           <option value="all">Everything with a recipe (84)</option>
         </select>
       </label>
+      <label class="stray-row" id="combine-row" title="Decomposition runs on the same centrifuge as the ore line's dust step, so one filter can drive both jobs: the compound dusts join the Centrifuge card instead of getting their own. Anything past 1024 characters spills into extra decomposition-only cards. Off gives them a separate card for a dedicated decomposition line. No effect on the Electrolyzer, or on routes with no centrifuge step.">
+        <input type="checkbox" id="combine-toggle" checked>
+        Merge centrifuge decomposition into the ore line's Centrifuge filter
+      </label>
       <div id="decomp-custom"></div>
     </section>
 

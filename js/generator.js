@@ -281,9 +281,15 @@ export function generateIOF(config, namespace) {
 // ---- Compound-dust decomposition cards ----
 // One card per decomposition machine matching final dusts of compound ore
 // materials. Splits into multiple regexes when over the filter length limit.
-export function generateDecomposition(materials, machine, dustNamespace, limit = 1024) {
-  const sorted = [...materials].sort((a, b) =>
-    a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0);
+//
+// `host` is an optional ore-processing card for the same physical machine (the
+// centrifuge runs both jobs). Given one, its segments lead the first card and
+// take their share of that card's budget, so a single filter drives both; any
+// dusts that no longer fit spill into decomposition-only cards as usual. The
+// dust form's guard — (?!Impure|Pure|Small|Tiny) — is what keeps the merged
+// alternation from stealing the host's dustImpure/dustPure inputs.
+export function generateDecomposition(materials, machine, dustNamespace, limit = 1024, host = null) {
+  const sorted = [...materials].sort(byName);
   const cards = [];
   let batch = [];
   const build = (names) => {
@@ -291,20 +297,25 @@ export function generateDecomposition(materials, machine, dustNamespace, limit =
     seg.regex = segmentRegex(seg, dustNamespace);
     return seg;
   };
+  const emit = (seg) => {
+    const merged = host && cards.length === 0;
+    const segments = merged ? [...host.segments, seg] : [seg];
+    const regex = segments.map(s => s.regex).join("|");
+    cards.push({ machine: merged ? host.machine : machine, merged: !!merged, segments, regex, length: regex.length });
+  };
   for (const name of sorted) {
+    // Only the first card pays for the host, plus the "|" that joins them.
+    const budget = host && cards.length === 0 ? limit - host.regex.length - 1 : limit;
     const trial = build([...batch, name]);
-    if (trial.regex.length > limit && batch.length > 0) {
-      const seg = build(batch);
-      cards.push({ machine, segments: [seg], regex: seg.regex, length: seg.regex.length });
+    if (trial.regex.length > budget && batch.length > 0) {
+      emit(build(batch));
       batch = [name];
     } else {
       batch = [...batch, name];
     }
   }
-  if (batch.length) {
-    const seg = build(batch);
-    cards.push({ machine, segments: [seg], regex: seg.regex, length: seg.regex.length });
-  }
+  if (batch.length) emit(build(batch));
+  else if (host) cards.push({ ...host, merged: true });
   return cards;
 }
 
