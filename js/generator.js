@@ -112,6 +112,43 @@ export function producedForms(code) {
   return forms;
 }
 
+// GTNH 2.9 registers every ore block under its stone type's own oredict prefix
+// (GTBlockOre -> StoneType.getPrefix()): oreMoonIlmenite, oreNetherrackGold,
+// oreDeepslateCopper, ... The ore/rawOre form must therefore treat the stone
+// name as an optional infix between the form and the material — otherwise
+// stone-variant ores bypass both exclusions ("Do not process" ores still get
+// pulled) and special routes (stone variants fall through to common logic).
+export const STONE_INFIXES = [
+  "AlphaCentauri", "AnubisAndMaahes", "Asteroid", "BarnardaE", "BarnardaF",
+  "Basalt", "Blackgranite", "BlueIce", "Callisto", "Ceres", "Deepslate",
+  "Deimos", "Enceladus", "Endstone", "Europa", "Ganymede", "Haumea", "Horus",
+  "Io", "Makemake", "Marble", "Mars", "Mercury", "Miranda", "Moon",
+  "Netherrack", "Oberon", "PackedIce", "Phobos", "Pluto", "Proteus",
+  "Redgranite", "SethClay", "SethIce", "TCetiE", "Titan", "Triton", "Tuff",
+  "VegaB", "Venus",
+];
+const STONE_OPT = `(?:${STONE_INFIXES.join("|")})?`;
+// Exclusions additionally veto the "Small" quantity variant; it is never
+// positively routed (small ores macerate straight to dust, not crushed).
+const VETO_OPT = `(?:Small|${STONE_INFIXES.join("|")})?`;
+
+// Abbreviation namespace for the ore/rawOre form: the plain namespace plus
+// every stone-prefixed material name. Without this, a material's shortest
+// unique prefix can alias an entire stone family (DeepIron -> "Deep" would
+// swallow every Deepslate ore; Moonstone -> "Moo" every Moon ore).
+const EXT_CACHE = new WeakMap();
+function stoneExtendedNamespace(namespace) {
+  let ext = EXT_CACHE.get(namespace);
+  if (!ext) {
+    ext = [...namespace];
+    for (const stone of STONE_INFIXES) {
+      for (const n of namespace) ext.push(stone + n);
+    }
+    EXT_CACHE.set(namespace, ext);
+  }
+  return ext;
+}
+
 // Shortest prefix of `name` that no other namespace entry starts with.
 // Returns {prefix} or {exact:true} when another name extends this one.
 export function abbreviate(name, namespace) {
@@ -146,16 +183,22 @@ function alternation(groups, namespace) {
 
 // A segment: one input form on one machine card.
 //   common: ^form[guard](?!EXCL$)[A-Z].*$   special: ^form(?:...)$
+// For the ore/rawOre form, exclusions veto through an optional stone/Small
+// infix (inside the lookahead, where alternation cannot be defeated by
+// backtracking), and special segments accept an optional stone infix so
+// stone-variant ores follow their material's route.
 function segmentRegex(seg, namespace) {
   const form = FORMS[seg.form];
+  const isOre = seg.form === "oreRaw";
+  const ns = isOre ? stoneExtendedNamespace(namespace) : namespace;
   if (seg.common) {
     const guard = form.guard || "";
     const excl = seg.exclGroups.some(g => g.length)
-      ? `(?!${alternation(seg.exclGroups.filter(g => g.length), namespace)}$)`
+      ? `(?!${isOre ? VETO_OPT : ""}${alternation(seg.exclGroups.filter(g => g.length), ns)}$)`
       : "";
     return `^${form.re}${guard}${excl}[A-Z].*$`;
   }
-  return `^${form.re}${alternation([seg.only], namespace)}$`;
+  return `^${form.re}${isOre ? STONE_OPT : ""}${alternation([seg.only], ns)}$`;
 }
 
 const FORM_ORDER = ["oreRaw", "crushed", "crushedPurified", "crushedCentrifuged", "dustImpure", "dustPure"];
