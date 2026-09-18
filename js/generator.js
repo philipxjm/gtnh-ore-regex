@@ -227,6 +227,13 @@ function segmentRegex(seg, namespace) {
   // slice of, so a chunk of a split segment still abbreviates against the
   // whole list — a prefix reaching into a sibling chunk routes those names
   // to the same machine either way.
+  // A composite segment (seg.forms) covers several intermediate forms with
+  // one shared member alternation: the forms all route to the same machine,
+  // so one token list serves them all. Never used for the ore form.
+  if (seg.forms) {
+    const alt = seg.forms.map(f => FORMS[f].re + (FORMS[f].guard || "")).join("|");
+    return `^(?:${alt})${alternation([seg.only], ns, seg.fullSet)}$`;
+  }
   return `^${form.re}${isOre ? STONE_OPT : ""}${alternation([seg.only], ns, seg.fullSet)}$`;
 }
 
@@ -370,6 +377,21 @@ export const IOF_MODES = {
   MPTM: 0, MPMC: 1, MMC: 2, MPS: 3, MBMC: 4, MBTM: 5, HHW: 6,
 };
 
+// The machine accepts every intermediate form and each mode's step chain
+// picks up whatever arrives mid-chain (MTEIntegratedOreFactory.isValidOreInput
+// plus the per-mode step switch). A form listed here entering that mode is
+// finished; one not listed passes through unprocessed — MPS has no centrifuge
+// so dusts idle through it, MPMC has no thermal step so centrifuged ore does.
+const IOF_MODE_FORMS = {
+  MPTM: ["oreRaw", "crushed", "crushedPurified", "crushedCentrifuged"],
+  MPMC: ["oreRaw", "crushed", "crushedPurified", "dustImpure", "dustPure"],
+  MMC: ["oreRaw", "crushed", "crushedPurified", "crushedCentrifuged", "dustImpure", "dustPure"],
+  MPS: ["oreRaw", "crushed", "crushedPurified"],
+  MBMC: ["oreRaw", "crushed", "crushedPurified", "dustImpure", "dustPure"],
+  MBTM: ["oreRaw", "crushed", "crushedPurified", "crushedCentrifuged"],
+  HHW: ["oreRaw", "crushed", "crushedPurified", "crushedCentrifuged", "dustImpure", "dustPure"],
+};
+
 export function generateIOF(config, namespace, opts = {}) {
   const { commonRoute, ores } = config;
   const limit = opts.limit ?? 1024;
@@ -380,15 +402,28 @@ export function generateIOF(config, namespace, opts = {}) {
   const cards = [];
   const unsupported = [];
 
-  const pushCard = (mode, route, seg) => {
+  // A mode's card matches its members' ore/rawOre forms and — with stray
+  // intermediates on — every intermediate form that mode's chain consumes,
+  // so bee products and manual inserts ride the same filter to the same
+  // machine. Splitting across the length limit works as in regular mode.
+  const pushMemberCard = (mode, route, members) => {
+    const segments = [];
+    const oreSeg = { form: "oreRaw", common: false, only: members };
+    oreSeg.regex = segmentRegex(oreSeg, namespace);
+    segments.push(oreSeg);
+    if (opts.strayIntermediates) {
+      const forms = IOF_MODE_FORMS[route].filter(f => f !== "oreRaw");
+      const seg = { form: forms[0], forms, common: false, only: members };
+      seg.regex = segmentRegex(seg, namespace);
+      segments.push(seg);
+    }
+    packCards("iof", segments, namespace, limit).forEach(card => {
+      cards.push({ ...card, mode, route });
+    });
+  };
+  const pushCatchAllCard = (mode, route, seg) => {
     seg.regex = segmentRegex(seg, namespace);
-    const parts = !seg.common && seg.regex.length > limit
-      ? splitSpecialSegment(seg, namespace, limit)
-      : [seg];
-    parts.forEach((p, i) => cards.push({
-      machine: "iof", mode, route, segments: [p], regex: p.regex, length: p.regex.length,
-      part: parts.length > 1 ? `${i + 1}/${parts.length}` : undefined,
-    }));
+    cards.push({ machine: "iof", mode, route, segments: [seg], regex: seg.regex, length: seg.regex.length });
   };
 
   if (IOF_MODES[commonRoute] === undefined) unsupported.push({ route: commonRoute, ores: ["(common logic)"] });
@@ -402,12 +437,12 @@ export function generateIOF(config, namespace, opts = {}) {
       .filter(o => o.route === commonRoute || o.route === "common")
       .map(o => o.en);
     if (members.length) {
-      pushCard(IOF_MODES[commonRoute], commonRoute, { form: "oreRaw", common: false, only: members });
+      pushMemberCard(IOF_MODES[commonRoute], commonRoute, members);
     } else {
       const exclGroups = groupOrder.map(route => route === "common"
         ? []
         : ores.filter(o => o.route === route && o.route !== commonRoute).map(o => o.en));
-      pushCard(IOF_MODES[commonRoute], commonRoute, { form: "oreRaw", common: true, exclGroups });
+      pushCatchAllCard(IOF_MODES[commonRoute], commonRoute, { form: "oreRaw", common: true, exclGroups });
     }
   }
 
@@ -416,7 +451,7 @@ export function generateIOF(config, namespace, opts = {}) {
     const members = ores.filter(o => o.route === route).map(o => o.en);
     if (!members.length) continue;
     if (IOF_MODES[route] === undefined) { unsupported.push({ route, ores: members }); continue; }
-    pushCard(IOF_MODES[route], route, { form: "oreRaw", common: false, only: members });
+    pushMemberCard(IOF_MODES[route], route, members);
   }
   return { cards, unsupported };
 }

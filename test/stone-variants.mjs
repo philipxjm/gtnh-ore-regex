@@ -99,4 +99,31 @@ const cardFor = (cards, machine) => cards.find(c => c.machine === machine);
   check("decompose: oreIchorium excluded", !mac.test("oreIchorium"));
 }
 
+// --- 7. IOF intermediates: bee/manual inputs ride their ore's mode card ---
+// The machine accepts every intermediate form; each mode finishes only the
+// forms its chain consumes (MPS has no centrifuge, MPMC no thermal step).
+{
+  const config = {
+    commonRoute: "MMC",
+    ores: [
+      { en: "Copper", route: "MMC" },
+      { en: "Galena", route: "MPMC" },
+      { en: "Ilmenite", route: "MPS" },
+    ],
+  };
+  const { cards } = generateIOF(config, NAMESPACE, { strayIntermediates: true });
+  const match = (route, name) => cards.filter(c => c.route === route).some(c => new RegExp(c.regex).test(name));
+  check("IOF stray: crushedPurifiedGalena on its MPMC card", match("MPMC", "crushedPurifiedGalena"));
+  check("IOF stray: crushedPurifiedGalena NOT on MMC card", !match("MMC", "crushedPurifiedGalena"));
+  check("IOF stray: dustPureGalena on MPMC card", match("MPMC", "dustPureGalena"));
+  check("IOF stray: crushedCentrifugedGalena NOT on MPMC (no thermal step)", !match("MPMC", "crushedCentrifugedGalena"));
+  check("IOF stray: crushedPurifiedIlmenite on MPS card", match("MPS", "crushedPurifiedIlmenite"));
+  check("IOF stray: dustImpureIlmenite NOT on MPS (no centrifuge step)", !match("MPS", "dustImpureIlmenite"));
+  check("IOF stray: crushedCentrifugedCopper on MMC card", match("MMC", "crushedCentrifugedCopper"));
+  check("IOF stray: oreGalena still on MPMC card", match("MPMC", "oreGalena"));
+  const off = generateIOF(config, NAMESPACE);
+  const offMatch = (route, name) => off.cards.filter(c => c.route === route).some(c => new RegExp(c.regex).test(name));
+  check("IOF stray off: ore-only cards (crushedGalena unmatched)", !offMatch("MPMC", "crushedGalena"));
+}
+
 process.exit(fail ? 1 : 0);

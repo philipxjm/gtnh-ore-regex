@@ -259,7 +259,7 @@ function renderOutputs() {
       // A machine whose joined filter would not fit 1024 characters arrives
       // as several cards; each is a complete filter for its share.
       modeTag: card.part ? "filter " + card.part : undefined,
-      segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
+      segments: card.segments.map(s => ({ ...s, formLabel: s.forms ? s.forms.map(f => FORM_LABELS[f]).join(" \u00b7 ") : FORM_LABELS[s.form] })),
     }, config));
   };
 
@@ -286,7 +286,7 @@ function renderOutputs() {
       for (const card of host ? centCards.slice(1) : centCards) push(card);
     }
   } else {
-    const { cards: iofCards, unsupported } = generateIOF(config, NAMESPACE);
+    const { cards: iofCards, unsupported } = generateIOF(config, NAMESPACE, { strayIntermediates: state.strayIntermediates });
     iofCards.sort((a, b) => a.mode - b.mode);
     for (const card of iofCards) {
       cards.push(machineCard({
@@ -295,7 +295,7 @@ function renderOutputs() {
         icon: "machine_macerator.png",
         regex: card.regex,
         modeTag: "mode " + (card.mode + 1) + (card.part ? " · " + card.part : ""),
-        segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
+        segments: card.segments.map(s => ({ ...s, formLabel: s.forms ? s.forms.map(f => FORM_LABELS[f]).join(" \u00b7 ") : FORM_LABELS[s.form] })),
       }, config));
     }
     for (const u of unsupported) {

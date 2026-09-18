@@ -58,7 +58,11 @@ The **Integrated Ore Factory** mode emits one regex per IOF processing mode inst
 since the IOF runs the whole chain internally), with mode numbers matching the machine's screwdriver cycle. When
 the configuration routes ores onto the common chain explicitly (the default wiki sorting lists every ore), the
 common mode's card is a positive list too — an unlisted ore then matches no card and stays in storage instead of
-riding a catch-all.
+riding a catch-all. With stray intermediates on, each mode's filter also matches the intermediate forms that
+mode's step chain actually consumes (verified against `MTEIntegratedOreFactory`'s mode switch) — a bee-produced
+purified ore rides the same filter to the same machine and is finished mid-chain. Forms a mode cannot finish are
+left out: the sifter mode takes no dusts (no centrifuge step), the washer+centrifuge mode no centrifuged ore
+(no thermal step), so nothing idles through a machine unprocessed.
 
 ## Default configuration
 
