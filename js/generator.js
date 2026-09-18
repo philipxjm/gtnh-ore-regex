@@ -144,6 +144,16 @@ function stoneExtendedNamespace(namespace) {
     for (const stone of STONE_INFIXES) {
       for (const n of namespace) ext.push(stone + n);
     }
+    // A material name that itself BEGINS with a stone name decomposes under
+    // the optional stone infix: oreCallistoIce can be parsed as ore +
+    // Callisto (stone) + "Ice", so a token like "Ic" (Ichorium) would claim
+    // CallistoIce for its own route. The stripped remainders join the
+    // domain so no token can silently match one.
+    for (const n of namespace) {
+      for (const stone of STONE_INFIXES) {
+        if (n.length > stone.length && n.startsWith(stone)) ext.push(n.slice(stone.length));
+      }
+    }
     EXT_CACHE.set(namespace, ext);
   }
   return ext;

@@ -7,7 +7,9 @@ export const NAMESPACE = ["Adamantium","Adamite","Adluorite","AgarditeCd","Agard
 // Default configuration = the wiki's Integrated Ore Factory sorting
 // (https://wiki.gtnewhorizons.com/wiki/Integrated_Ore_Factory, GTNH 2.9),
 // byproduct-optimized: M1=MPTM, M2=MPMC, M3=MMC, M4=MPS, Other=None. The
-// HEE ores and Ancient Debris the wiki does not sort default to None too.
+// HEE ores and Ancient Debris the wiki does not sort default to None too;
+// vanilla Quartz rides M4 with the other quartzes (the wiki's own filter
+// strings catch it via "*tz" even though its table has no row for it).
 export const DEFAULT_ORES = [
  {
   "en": "Apatite",
@@ -1612,6 +1614,11 @@ export const DEFAULT_ORES = [
  {
   "en": "Zinc",
   "icon": "icon_ds_zinc_ore.png",
+  "route": "MPS"
+ },
+ {
+  "en": "Quartz",
+  "icon": "icon_minecraft_quartz_ore.png",
   "route": "MPS"
  },
  {

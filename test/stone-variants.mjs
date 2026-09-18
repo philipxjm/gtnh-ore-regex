@@ -76,4 +76,27 @@ const cardFor = (cards, machine) => cards.find(c => c.machine === machine);
   check(`all ${STONE_INFIXES.length} stone infixes veto (leaks: ${leaks.join(",") || "none"})`, leaks.length === 0);
 }
 
+// --- 6. Stone-decomposable material names must not alias through the infix ---
+// CallistoIce parses as ore + Callisto (stone) + "Ice": a token for Ichorium
+// like "Ic" would claim it after the optional infix consumed "Callisto".
+{
+  const config = {
+    commonRoute: "MMC",
+    ores: [{ en: "Ichorium", route: "MMC" }, { en: "CallistoIce", route: "MPMC" }],
+  };
+  const { cards } = generateIOF(config, NAMESPACE);
+  const common = new RegExp(cards.find(c => c.route === "MMC").regex);
+  const special = new RegExp(cards.find(c => c.route === "MPMC").regex);
+  check("decompose: oreIchorium on common card", common.test("oreIchorium"));
+  check("decompose: oreMoonIchorium on common card", common.test("oreMoonIchorium"));
+  check("decompose: oreCallistoIce NOT claimed by Ichorium's card", !common.test("oreCallistoIce"));
+  check("decompose: oreCallistoIce on its own card", special.test("oreCallistoIce"));
+}
+{
+  const config = { commonRoute: "MMC", ores: [{ en: "Ichorium", route: "None" }] };
+  const mac = new RegExp(cardFor(generate(config, NAMESPACE), "macerator").regex);
+  check("decompose: excluding Ichorium keeps oreCallistoIce on common", mac.test("oreCallistoIce"));
+  check("decompose: oreIchorium excluded", !mac.test("oreIchorium"));
+}
+
 process.exit(fail ? 1 : 0);
