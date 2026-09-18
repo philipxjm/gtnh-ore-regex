@@ -17,7 +17,32 @@ const DISPLAY_OVERRIDES = {
   GarnetRed: "Red Garnet",
   GarnetYellow: "Yellow Garnet",
   Cooperite: "Sheldonite",
+  AgarditeCd: "Agardite (Cd)",
+  AgarditeLa: "Agardite (La)",
+  AgarditeNd: "Agardite (Nd)",
+  AgarditeY: "Agardite (Y)",
+  BariteRa: "Barite (Ra)",
+  CryoliteF: "Cryolite (F)",
+  DarkIron: "Deep Dark Iron",
+  DemicheleiteBr: "Demicheleite (Br)",
+  DraconiumAwakened: "Awakened Draconium",
+  ElectrumFlux: "Fluxed Electrum",
+  Flerovium_GT5U: "Flerovium",
+  Fluorite: "Fluorite (F)",
+  FoolsRuby: "Spinel",
+  GadoliniteCe: "Gadolinite (Ce)",
+  GadoliniteY: "Gadolinite (Y)",
+  LanthaniteCe: "Lanthanite (Ce)",
   LanthaniteLa: "Lanthanite (La)",
+  LanthaniteNd: "Lanthanite (Nd)",
+  NaquadahEnriched: "Enriched Naquadah",
+  Plutonium: "Plutonium 239",
+  SamarskiteY: "Samarskite (Y)",
+  SamarskiteYb: "Samarskite (Yb)",
+  Shadow: "Shadow Metal",
+  Silicon: "Raw Silicon",
+  TengamRaw: "Raw Tengam",
+  Uranium: "Uranium 238",
   HeeEndium: "Endium (HEE)",
   HeeEndPowder: "End Powder (HEE)",
   HeeIgneousRock: "Igneous Rock (HEE)",
@@ -231,6 +256,9 @@ function renderOutputs() {
     cards.push(machineCard({
       title: m.label, icon: m.icon, regex: card.regex,
       sub: card.merged ? m.multi + " · also decomposes compound dusts" : m.multi,
+      // A machine whose joined filter would not fit 1024 characters arrives
+      // as several cards; each is a complete filter for its share.
+      modeTag: card.part ? "filter " + card.part : undefined,
       segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
     }, config));
   };
@@ -266,7 +294,7 @@ function renderOutputs() {
         sub: routeLabel(card.route),
         icon: "machine_macerator.png",
         regex: card.regex,
-        modeTag: "mode " + (card.mode + 1),
+        modeTag: "mode " + (card.mode + 1) + (card.part ? " · " + card.part : ""),
         segments: card.segments.map(s => ({ ...s, formLabel: FORM_LABELS[s.form] })),
       }, config));
     }

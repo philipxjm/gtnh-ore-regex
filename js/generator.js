@@ -164,15 +164,30 @@ const byName = (a, b) => a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase(
 
 // names -> "(?:(?:p1|p2).*|Exact1|Exact2)"; group order preserved for the
 // grouped (common-exclusion) case, alphabetical within each group.
-function alternation(groups, namespace) {
+//
+// Abbreviation here is group-aware: the alternation as a whole only has to
+// match exactly the listed names, so a prefix is valid as soon as everything
+// it matches in the namespace is itself part of the list. Related materials
+// then share one token (all four Agardites -> "Agar"; Chrome, Chromite and
+// Chromo-Alumino-Povondraite -> "Chrom") instead of one each, which is what
+// keeps wiki-scale ore lists inside the 1024-character filter limit. A name
+// that is a strict prefix of an out-of-list name still has to be emitted as
+// an exact alternative, as before.
+function alternation(groups, namespace, fullList) {
+  const inList = fullList ?? new Set(groups.flat());
   const prefixes = [];
+  const seen = new Set();
   const exacts = [];
   for (const group of groups) {
     const sorted = [...group].sort(byName);
     for (const n of sorted) {
-      const a = abbreviate(n, namespace);
-      if (a.exact) exacts.push(n);
-      else prefixes.push(a.prefix);
+      let chosen;
+      for (let len = 1; len <= n.length; len++) {
+        const p = n.slice(0, len);
+        if (namespace.every(o => !o.startsWith(p) || inList.has(o))) { chosen = p; break; }
+      }
+      if (chosen === undefined) exacts.push(n);
+      else if (!seen.has(chosen)) { seen.add(chosen); prefixes.push(chosen); }
     }
   }
   const parts = [];
@@ -198,7 +213,11 @@ function segmentRegex(seg, namespace) {
       : "";
     return `^${form.re}${guard}${excl}[A-Z].*$`;
   }
-  return `^${form.re}${isOre ? STONE_OPT : ""}${alternation([seg.only], ns)}$`;
+  // seg.fullSet (when set) holds the complete member list this segment is a
+  // slice of, so a chunk of a split segment still abbreviates against the
+  // whole list — a prefix reaching into a sibling chunk routes those names
+  // to the same machine either way.
+  return `^${form.re}${isOre ? STONE_OPT : ""}${alternation([seg.only], ns, seg.fullSet)}$`;
 }
 
 const FORM_ORDER = ["oreRaw", "crushed", "crushedPurified", "crushedCentrifuged", "dustImpure", "dustPure"];
@@ -277,10 +296,61 @@ export function generate(config, namespace, opts = {}) {
     }
     if (!segments.length) continue;
     for (const seg of segments) seg.regex = segmentRegex(seg, namespace);
-    const regex = segments.map(s => s.regex).join("|");
-    cards.push({ machine, segments, regex, length: regex.length });
+    cards.push(...packCards(machine, segments, namespace, opts.limit ?? 1024));
   }
   return cards;
+}
+
+// Segments on one machine OR together, so a card whose joined regex exceeds
+// the filter length limit can split into several cards with the same total
+// meaning — each part is a complete filter for its share of the forms. An
+// oversized SPECIAL segment additionally splits by members (each chunk still
+// abbreviated against the full list, see segmentRegex). An oversized COMMON
+// segment cannot split — a negative lookahead only works whole — so it stays
+// as-is and the UI flags it.
+function splitSpecialSegment(seg, namespace, limit) {
+  const fullSet = seg.fullSet ?? new Set(seg.only);
+  const build = (names) => {
+    const part = { ...seg, only: names, fullSet };
+    part.regex = segmentRegex(part, namespace);
+    return part;
+  };
+  const chunks = [];
+  let batch = [];
+  for (const n of [...seg.only].sort(byName)) {
+    const trial = build([...batch, n]);
+    if (trial.regex.length > limit && batch.length > 0) {
+      chunks.push(build(batch));
+      batch = [n];
+    } else {
+      batch = [...batch, n];
+    }
+  }
+  if (batch.length) chunks.push(build(batch));
+  return chunks;
+}
+
+function packCards(machine, segments, namespace, limit) {
+  const units = [];
+  for (const seg of segments) {
+    if (!seg.common && seg.regex.length > limit) units.push(...splitSpecialSegment(seg, namespace, limit));
+    else units.push(seg);
+  }
+  const groups = [];
+  let cur = [];
+  const lenOf = segs => segs.reduce((n, s) => n + s.regex.length + 1, -1);
+  for (const u of units) {
+    if (cur.length && lenOf([...cur, u]) > limit) { groups.push(cur); cur = [u]; }
+    else cur.push(u);
+  }
+  if (cur.length) groups.push(cur);
+  return groups.map((segs, i) => {
+    const regex = segs.map(s => s.regex).join("|");
+    return {
+      machine, segments: segs, regex, length: regex.length,
+      part: groups.length > 1 ? `${i + 1}/${groups.length}` : undefined,
+    };
+  });
 }
 
 // ---- Integrated Ore Factory mode ----
@@ -290,8 +360,9 @@ export const IOF_MODES = {
   MPTM: 0, MPMC: 1, MMC: 2, MPS: 3, MBMC: 4, MBTM: 5, HHW: 6,
 };
 
-export function generateIOF(config, namespace) {
+export function generateIOF(config, namespace, opts = {}) {
   const { commonRoute, ores } = config;
+  const limit = opts.limit ?? 1024;
   const groupOrder = [];
   for (const o of ores) {
     if (!groupOrder.includes(o.route)) groupOrder.push(o.route);
@@ -299,14 +370,35 @@ export function generateIOF(config, namespace) {
   const cards = [];
   const unsupported = [];
 
+  const pushCard = (mode, route, seg) => {
+    seg.regex = segmentRegex(seg, namespace);
+    const parts = !seg.common && seg.regex.length > limit
+      ? splitSpecialSegment(seg, namespace, limit)
+      : [seg];
+    parts.forEach((p, i) => cards.push({
+      machine: "iof", mode, route, segments: [p], regex: p.regex, length: p.regex.length,
+      part: parts.length > 1 ? `${i + 1}/${parts.length}` : undefined,
+    }));
+  };
+
   if (IOF_MODES[commonRoute] === undefined) unsupported.push({ route: commonRoute, ores: ["(common logic)"] });
   else {
-    const exclGroups = groupOrder.map(route => route === "common"
-      ? []
-      : ores.filter(o => o.route === route && o.route !== commonRoute).map(o => o.en));
-    const seg = { form: "oreRaw", common: true, exclGroups };
-    seg.regex = segmentRegex(seg, namespace);
-    cards.push({ machine: "iof", mode: IOF_MODES[commonRoute], route: commonRoute, segments: [seg], regex: seg.regex, length: seg.regex.length });
+    // A config that routes ores onto the common chain explicitly (the wiki
+    // sorting lists every ore) defines that mode's membership outright, so
+    // its card is the positive list — an unlisted ore then matches no card
+    // and stays in storage instead of riding a catch-all. Only a config
+    // with no explicit members keeps the catch-all card.
+    const members = ores
+      .filter(o => o.route === commonRoute || o.route === "common")
+      .map(o => o.en);
+    if (members.length) {
+      pushCard(IOF_MODES[commonRoute], commonRoute, { form: "oreRaw", common: false, only: members });
+    } else {
+      const exclGroups = groupOrder.map(route => route === "common"
+        ? []
+        : ores.filter(o => o.route === route && o.route !== commonRoute).map(o => o.en));
+      pushCard(IOF_MODES[commonRoute], commonRoute, { form: "oreRaw", common: true, exclGroups });
+    }
   }
 
   for (const route of groupOrder) {
@@ -314,9 +406,7 @@ export function generateIOF(config, namespace) {
     const members = ores.filter(o => o.route === route).map(o => o.en);
     if (!members.length) continue;
     if (IOF_MODES[route] === undefined) { unsupported.push({ route, ores: members }); continue; }
-    const seg = { form: "oreRaw", common: false, only: members };
-    seg.regex = segmentRegex(seg, namespace);
-    cards.push({ machine: "iof", mode: IOF_MODES[route], route, segments: [seg], regex: seg.regex, length: seg.regex.length });
+    pushCard(IOF_MODES[route], route, { form: "oreRaw", common: false, only: members });
   }
   return { cards, unsupported };
 }

@@ -24,9 +24,12 @@ machine, which forms of which materials it should accept:
   elsewhere (`^crushed(?!Purified|Centrifuged)(?!(?:...)$)[A-Z].*$`).
 - **Special logic** segments match only the listed ores (`^crushedPurified(?:(?:Chromo|Fluor-|...).*)$`).
 
-Material names are abbreviated to the **shortest prefix unique within the full GTNH ore-material namespace**;
-a name that is a strict prefix of another (Quartz, Tin, Platinum, Iridium, Cassiterite, ...) is emitted as an exact
-alternative instead of a prefix wildcard.
+Material names are abbreviated to the **shortest prefix that matches nothing outside the listed group** — an
+alternation only has to match exactly its own list, so related materials share one token (all four Agardites
+collapse to `Agar`; Chrome, Chromite and Chromo-Alumino-Povondraite to `Chrom`). A name that is a strict prefix
+of an out-of-group name (Quartz, Tin, Platinum, ...) is emitted as an exact alternative instead of a prefix
+wildcard. A card whose joined regex would not fit the 1024-character filter limit is split into several
+complete filters (`filter 1/2`, ...) — form segments OR together, so the split changes nothing semantically.
 
 **Stray intermediates**: by default the generator also routes intermediate forms
 the common route would not itself produce — `crushedPurified`/`crushedCentrifuged`/
@@ -52,14 +55,27 @@ cards. Untick the merge to drive a dedicated decomposition line instead. Routes
 with no centrifuge step have nothing to merge into and always get their own card.
 
 The **Integrated Ore Factory** mode emits one regex per IOF processing mode instead (matching `ore`/`rawOre` only,
-since the IOF runs the whole chain internally), with mode numbers matching the machine's screwdriver cycle.
+since the IOF runs the whole chain internally), with mode numbers matching the machine's screwdriver cycle. When
+the configuration routes ores onto the common chain explicitly (the default wiki sorting lists every ore), the
+common mode's card is a positive list too — an unlisted ore then matches no card and stays in storage instead of
+riding a catch-all.
+
+## Default configuration
+
+The default ore sorting is the [Integrated Ore Factory wiki page](https://wiki.gtnewhorizons.com/wiki/Integrated_Ore_Factory)'s
+recommended byproduct-optimized assignment for GTNH 2.9: its M1 (30s) column is the Macerator → Ore Washer →
+Thermal Centrifuge → Macerator route, M2 (15s) the washer + centrifuge route, M3 (10s) the plain
+macerate-twice-and-centrifuge route (the common chain), M4 (20s) the sifter route, and its "Other" column —
+plus the HEE ores and Ancient Debris the wiki does not sort — defaults to *Do not process*. Opening the tool in
+IOF mode therefore yields exactly the wiki's four modes as four filter cards.
 
 ## Data provenance
 
-- The material namespace (355 names) is extracted from the GT5-Unofficial `5.09.52.594` sources: GregTech
-  `MaterialsInit` (`.addOreItems()`), BartWorks werkstoffs (default generation includes ores), GT++
-  `MaterialsOres`/`MaterialMisc` (`MaterialState.ORE`, oredict-sanitized), and GTNH-Lanthanides werkstoff pools,
-  plus the handful of modded ores the original tool tracks (HEE, Ancient Debris, Oilsands, vanilla Quartz).
+- The material namespace (362 names) is extracted from the GT5-Unofficial `5.09.54.133` (GTNH 2.9) sources:
+  GregTech `MaterialsInit` (`.addOreItems()`), BartWorks werkstoffs (default generation includes ores), GT++
+  `MaterialsOres`/`MaterialMisc` (`MaterialState.ORE`, oredict-sanitized), GTNH-Lanthanides and GoodGenerator
+  werkstoff pools, plus AncientGranite/Koboldite/Runite (GT++ ores verified against the 2.9 runtime dataset)
+  and the handful of modded ores the original tool tracks (HEE, Ancient Debris, Oilsands, vanilla Quartz).
 - The default special-ore set and the generation algorithm were reverse-engineered from the original tool's
   rendered output and validated against it: `node test/validate.mjs` regenerates a reference configuration and
   asserts **semantic equality** with the original's six regexes over the full synthetic item universe.
