@@ -1,4 +1,4 @@
-import { NAMESPACE, DEFAULT_ORES, DECOMP_ELECTROLYZER, DECOMP_CENTRIFUGE, DECOMP_ELECTROLYZER_SAFE, DECOMP_CENTRIFUGE_SAFE, DUST_NAMESPACE } from "./data.js";
+import { NAMESPACE, DEFAULT_ORES, DECOMP_ELECTROLYZER, DECOMP_CENTRIFUGE, DECOMP_ELECTROLYZER_SAFE, DECOMP_CENTRIFUGE_SAFE, DUST_NAMESPACE, SIFTABLE } from "./data.js";
 import {
   MACHINES, ROUTES, routeLabel, generate, generateIOF, generateDecomposition,
   encodeFragment, decodeFragment,
@@ -6,7 +6,8 @@ import {
 
 const CHAR_LIMIT = 1024;
 const COMMON_CHOICES = ["MPTM", "MPMC", "MMC", "MHW", "HHW"];
-const ROUTE_OPTIONS = ["common", "MPTM", "MPMC", "MMC", "MHW", "HHW", "MPS", "MTM", "MBMC", "MBTM", "M", "H", "MM", "MP", "None"];
+const ROUTE_OPTIONS = ["common", "MPTM", "MPMC", "MMC", "MHW", "HHW", "MPS", "MTM", "MBMC", "MBTM", "M", "H", "MM", "MP", "MW", "MWS", "MWTM", "MWMC", "None"];
+const SIFTABLE_SET = new Set(SIFTABLE);
 const MACHINE_ORDER = ["macerator", "washer", "chembath", "thermal", "sifter", "centrifuge", "hammer", "simplewasher"];
 
 const oreMeta = new Map(DEFAULT_ORES.map(o => [o.en, o]));
@@ -66,6 +67,7 @@ const state = {
   mode: "regular",
   sort: "route",
   strayIntermediates: true,
+  simpleWasher: false,
   decompMode: "safe", // off | safe | all
   combineCentrifuge: true,
   decompExtra: { electrolyzer: [], centrifuge_decomp: [] },
@@ -157,6 +159,11 @@ function sortedOres() {
   return ores;
 }
 
+function noSifterRecipe(ore) {
+  const route = ore.route === "common" ? state.commonRoute : ore.route;
+  return route.endsWith("S") && !SIFTABLE_SET.has(ore.en);
+}
+
 function renderOreGrid() {
   const grid = $("#ore-grid");
   grid.replaceChildren(...sortedOres().map(ore => {
@@ -176,6 +183,9 @@ function renderOreGrid() {
       el("div", { class: "ore-names" },
         el("div", { class: "ore-en", title: ore.en }, ore.en),
         el("div", { class: "ore-sub" }, displayName(ore.en) || " "),
+        ...(noSifterRecipe(ore) ? [el("div", { class: "ore-note",
+          title: "This material's purified crushed ore has no Sifter recipe, so the sift step is skipped: it leaves the washer as purified crushed ore." },
+          "no sifter recipe \u2192 kept as purified crushed")] : []),
       ),
       el("button", {
         class: "ore-remove", title: "Remove " + ore.en,
@@ -264,7 +274,11 @@ function renderOutputs() {
   };
 
   if (state.mode === "regular") {
-    const generated = generate(config, NAMESPACE, { strayIntermediates: state.strayIntermediates });
+    const generated = generate(config, NAMESPACE, {
+      strayIntermediates: state.strayIntermediates,
+      simpleWasher: state.simpleWasher,
+      siftable: SIFTABLE_SET,
+    });
     generated.sort((a, b) => MACHINE_ORDER.indexOf(a.machine) - MACHINE_ORDER.indexOf(b.machine));
 
     // Decomposition runs on the same physical centrifuge as the ore line's, so
@@ -381,6 +395,18 @@ for (const btn of document.querySelectorAll(".sort-btn")) {
     for (const b of document.querySelectorAll(".sort-btn")) b.classList.toggle("is-active", b === btn);
     renderOreGrid();
   });
+}
+
+$("#simplewasher-toggle").addEventListener("change", (e) => {
+  state.simpleWasher = e.target.checked;
+  renderOutputs();
+});
+
+{
+  const safeCount = new Set([...DECOMP_ELECTROLYZER_SAFE, ...DECOMP_CENTRIFUGE_SAFE]).size;
+  const allCount = new Set([...DECOMP_ELECTROLYZER, ...DECOMP_CENTRIFUGE]).size;
+  $("#decomp-safe-opt").textContent = `Conservative (${safeCount} decompose-only dusts)`;
+  $("#decomp-all-opt").textContent = `Everything with a recipe (${allCount})`;
 }
 
 $("#stray-toggle").addEventListener("change", (e) => {

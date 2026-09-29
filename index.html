@@ -41,12 +41,16 @@
         <input type="checkbox" id="stray-toggle" checked>
         Route stray intermediates (bee products, manual inserts)
       </label>
-      <label class="stray-row" title="Adds Electrolyzer and Centrifuge cards for compound ore dusts. Conservative: only the 16 dusts with no other recipe uses anywhere (safe to always decompose). Everything: all 84 dusts that have a decomposition recipe — including chain feedstocks like Bauxite and Apatite that you may want to keep.">
+      <label class="stray-row" title="Swap every Ore Washing Plant step for the Simple Washer: the same purified crushed ore, without the washer's byproducts (and without its water/energy). Applies to the multiblock line only — the Integrated Ore Factory has its own washer.">
+        <input type="checkbox" id="simplewasher-toggle">
+        Use Simple Washer instead of Ore Washer (no washer byproducts)
+      </label>
+      <label class="stray-row" title="Adds Electrolyzer and Centrifuge cards for compound ore dusts. Conservative: only dusts nothing else in the pack consumes, so decomposing them never takes a chain's input. Everything: every ore dust with a decomposition recipe — including chain feedstocks like Bauxite and Apatite that you may want to keep.">
         Decompose compound dusts:
         <select id="decomp-mode" class="ore-route" style="width:auto">
           <option value="off">Off</option>
-          <option value="safe" selected>Conservative (16 decompose-only dusts)</option>
-          <option value="all">Everything with a recipe (84)</option>
+          <option value="safe" selected id="decomp-safe-opt">Conservative (decompose-only dusts)</option>
+          <option value="all" id="decomp-all-opt">Everything with a recipe</option>
         </select>
       </label>
       <label class="stray-row" id="combine-row" title="Decomposition runs on the same centrifuge as the ore line's dust step, so one filter can drive both jobs: the compound dusts join the Centrifuge card instead of getting their own. Anything past 1024 characters spills into extra decomposition-only cards. Off gives them a separate card for a dedicated decomposition line. No effect on the Electrolyzer, or on routes with no centrifuge step.">

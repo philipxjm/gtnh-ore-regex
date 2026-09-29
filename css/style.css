@@ -243,6 +243,7 @@ code { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; color: var(--
 .ore-names { min-width: 0; }
 .ore-en { font-weight: 600; font-size: 0.83rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ore-sub { color: var(--text-dim); font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ore-note { grid-column: 1 / -1; color: var(--amber); font-size: 0.68rem; opacity: 0.85; }
 .ore-route {
   grid-column: 2 / 4;
   width: 100%;

@@ -37,7 +37,8 @@ export const MACHINES = {
 //   P wash:     crushed->crushedPurified          B bathe: crushed->crushedPurified
 //   T thermal:  crushed|crushedPurified->crushedCentrifuged
 //   C centrifuge: dustImpure|dustPure->dust       S sift: crushedPurified->gems
-//   H hammer:   ore->crushed, crushed->dustImpure W simple-wash: dustImpure->dust
+//   H hammer:   ore->crushed, crushed->dustImpure
+//   W simple-wash: crushed->crushedPurified (no byproducts), dustImpure|dustPure->dust
 export const ROUTES = {
   MPTM: { note: "Full line: washer + thermal byproducts · slowest" },
   MPMC: { note: "Most byproducts · slow" },
@@ -45,6 +46,7 @@ export const ROUTES = {
   MHW: { note: "Fewest byproducts · fast" },
   HHW: { note: "Halved main output · no byproducts · fastest" },
   MPS: {}, MTM: {}, MBMC: {}, MBTM: {},
+  MW: {}, MWS: {}, MWTM: {}, MWMC: {},
   M: {}, H: {}, MM: {}, MP: {}, None: {}, common: {},
 };
 
@@ -69,7 +71,8 @@ export function routeSteps(code) {
         break;
       case "P": case "B": form = "crushedPurified"; break;
       case "T": form = "crushedCentrifuged"; break;
-      case "C": case "W": case "S": form = "done"; break;
+      case "W": form = form === "crushed" ? "crushedPurified" : "done"; break;
+      case "C": case "S": form = "done"; break;
     }
   }
   return steps;
@@ -103,7 +106,8 @@ export function producedForms(code) {
           case "H": form = form === "oreRaw" ? "crushed" : "dustImpure"; break;
           case "P": case "B": form = "crushedPurified"; break;
           case "T": form = "crushedCentrifuged"; break;
-          case "C": case "W": case "S": form = "done"; break;
+          case "W": form = form === "crushed" ? "crushedPurified" : "done"; break;
+          case "C": case "S": form = "done"; break;
         }
         if (form !== "done" && form !== "dust") forms.add(form);
       }
@@ -253,8 +257,24 @@ const STRAY_CONTINUATION = {
 // config: { commonRoute, ores: [{en, route}, ...] }  (route may be "common")
 // opts.strayIntermediates: also route stray intermediate forms via common logic.
 // Returns [{machine, segments:[{form, common, only?, exclGroups?, regex}], regex, length}]
+// Route rewrites applied before generation (regular mode only — the IOF runs
+// its own chain):
+//   opts.simpleWasher: every Ore Washer step (P) becomes a Simple Washer step
+//     (W) — same purified crushed ore, no washer byproducts.
+//   opts.siftable: Set of materials with a Sifter recipe; a sift step is
+//     dropped for everything else, so the purified crushed ore leaves the
+//     washer instead of stranding in a sifter that can't process it.
+function effectiveRoute(route, material, opts) {
+  if (route === "None" || route === "common") return route;
+  let r = route;
+  if (opts.simpleWasher) r = r.replace(/P/g, "W");
+  if (opts.siftable && r.endsWith("S") && !opts.siftable.has(material)) r = r.slice(0, -1);
+  return r;
+}
+
 export function generate(config, namespace, opts = {}) {
-  const { commonRoute, ores } = config;
+  const commonRoute = effectiveRoute(config.commonRoute, null, { simpleWasher: opts.simpleWasher });
+  const ores = config.ores.map(o => ({ en: o.en, route: effectiveRoute(o.route, o.en, opts) }));
   const resolved = ores.map(o => ({ en: o.en, route: o.route === "common" ? commonRoute : o.route, explicit: o.route }));
 
   // Group order = first appearance in the ore list (drives exclusion ordering).

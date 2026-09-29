@@ -16,7 +16,8 @@ URL fragment format is identical, so links saved from the original tool open her
 ## How it works
 
 Each route code is a chain of machine letters — **M**acerate, **P** ore-wash, **B** chemical-bath, **T** thermal-centrifuge,
-**S**ift, **C**entrifuge, **H** forge-hammer, **W** simple-washer. The generator tracks the GregTech item form through the
+**S**ift, **C**entrifuge, **H** forge-hammer, **W** simple-washer (crushed → purified crushed with no byproducts, or
+impure/purified dust → dust). The generator tracks the GregTech item form through the
 chain (`ore → crushed → crushedPurified / crushedCentrifuged → dustImpure / dustPure → dust`) and collects, for every
 machine, which forms of which materials it should accept:
 
@@ -39,10 +40,24 @@ configured routes. Untick the option for byte-compatibility with the original
 tool's output.
 
 **Compound-dust decomposition**: optional extra cards matching the *final* dusts
-that break down further, for the Electrolyzer and the Centrifuge. Conservative
-mode lists only the dusts with no other recipe use anywhere; Everything lists all
-84 with a decomposition recipe, including chain feedstocks like Bauxite and
-Apatite you may well want to keep whole. Either list is editable per machine.
+that break down further, for the Electrolyzer and the Centrifuge. Both lists come
+from the GTNH 2.9 recipe registry itself (every Electrolyzer / Centrifuge recipe on
+an ore material's dust), not just GregTech's material flags, which miss recipes
+other loaders add — all six garnets, for one. Conservative mode lists only the
+dusts nothing else in the pack consumes (Tantalite, the garnets, Kyanite, …);
+Everything lists every ore dust with a decomposition recipe, including chain
+feedstocks like Bauxite and Apatite you may well want to keep whole. Dusts with
+both recipes default to the centrifuge. Either list is editable per machine.
+
+**Simple Washer**: the MW / MWS / MWTM / MWMC routes mirror every Ore Washer route
+with the Simple Washer, for ores where the washer's byproduct isn't wanted; the
+"Use Simple Washer instead of Ore Washer" switch applies that swap to every route
+at once (multiblock line only — the IOF has its own washer).
+
+**Sifter**: a sift step only applies to materials whose purified crushed ore has
+a Sifter recipe. Anything else (Sphalerite, Pyrite, Scheelite, Zinc, Molybdenite,
+Molybdenum, vanilla Quartz) leaves the washer as purified crushed ore instead of
+stranding in a sifter subnet, and its card is marked in the ore list.
 
 Decomposition is not a separate machine from the ore line's centrifuge step, so
 by default the compound dusts are **merged into the Centrifuge card** rather than
@@ -82,6 +97,12 @@ macerate-twice-and-centrifuge route (the common chain), M4 (20s) the sifter rout
 plus the HEE ores and Ancient Debris the wiki does not sort — defaults to *Do not process*. Opening the tool in
 IOF mode therefore yields exactly the wiki's four modes as four filter cards.
 
+That sorting is written for late-game Integrated Ore Factory setups fed by Space Elevator mining modules or Void
+Miners (the wiki's own caveat), and optimizes byproducts, not mid-game chains. Some choices will not suit an earlier
+base: Chalcopyrite and Galena are fully processed rather than kept as purified crushed ore for Platinum or Indium
+processing, and Monazite / Bastnasite are left raw for their dedicated lines. Change any ore's route in the list —
+e.g. to Macerator → Ore Washing Plant or Macerator → Simple Washer to keep it as purified crushed ore.
+
 ## Data provenance
 
 - The material namespace (362 names) is extracted from the GT5-Unofficial `5.09.54.133` (GTNH 2.9) sources:
@@ -99,7 +120,8 @@ IOF mode therefore yields exactly the wiki's four modes as four filter cards.
 ## Development
 
 No build step. `python3 -m http.server` (or any static server) in the repo root, then open `index.html`.
-Run the checks with `node test/validate.mjs`, `node test/stone-variants.mjs` and `node test/iof-coverage.mjs`.
+Run the checks with `node test/validate.mjs`, `node test/stone-variants.mjs`, `node test/iof-coverage.mjs` and
+`node test/routes.mjs`.
 
 Ore and machine icons belong to their respective mods (GregTech, BartWorks, GT++, HardcoreEnderExpansion,
 Et Futurum Requiem, Minecraft); this is a non-commercial fan tool, not affiliated with the GTNH team or huijiwiki.
