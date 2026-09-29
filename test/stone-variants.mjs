@@ -57,10 +57,13 @@ const cardFor = (cards, machine) => cards.find(c => c.machine === machine);
 {
   const config = { commonRoute: "MMC", ores: [{ en: "Ilmenite", route: "None" }, { en: "Galena", route: "MPMC" }] };
   const { cards } = generateIOF(config, NAMESPACE);
-  const common = cards.find(c => c.route === "MMC");
-  const special = cards.find(c => c.route === "MPMC");
-  const rc = new RegExp(common.regex);
-  const rs = new RegExp(special.regex);
+  // The common mode may span several filters (split by material initial).
+  const anyOf = route => {
+    const res = cards.filter(c => c.route === route).map(c => new RegExp(c.regex));
+    return { test: name => res.some(r => r.test(name)) };
+  };
+  const rc = anyOf("MMC");
+  const rs = anyOf("MPMC");
   check("IOF: oreMoonIlmenite excluded from common card", !rc.test("oreMoonIlmenite"));
   check("IOF: oreGalena on special card", rs.test("oreGalena"));
   check("IOF: oreMarsGalena on special card", rs.test("oreMarsGalena"));
@@ -85,8 +88,12 @@ const cardFor = (cards, machine) => cards.find(c => c.machine === machine);
     ores: [{ en: "Ichorium", route: "MMC" }, { en: "CallistoIce", route: "MPMC" }],
   };
   const { cards } = generateIOF(config, NAMESPACE);
-  const common = new RegExp(cards.find(c => c.route === "MMC").regex);
-  const special = new RegExp(cards.find(c => c.route === "MPMC").regex);
+  const anyOf = route => {
+    const res = cards.filter(c => c.route === route).map(c => new RegExp(c.regex));
+    return { test: name => res.some(r => r.test(name)) };
+  };
+  const common = anyOf("MMC");
+  const special = anyOf("MPMC");
   check("decompose: oreIchorium on common card", common.test("oreIchorium"));
   check("decompose: oreMoonIchorium on common card", common.test("oreMoonIchorium"));
   check("decompose: oreCallistoIce NOT claimed by Ichorium's card", !common.test("oreCallistoIce"));

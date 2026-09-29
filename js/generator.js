@@ -421,28 +421,32 @@ export function generateIOF(config, namespace, opts = {}) {
       cards.push({ ...card, mode, route });
     });
   };
-  const pushCatchAllCard = (mode, route, seg) => {
-    seg.regex = segmentRegex(seg, namespace);
-    cards.push({ machine: "iof", mode, route, segments: [seg], regex: seg.regex, length: seg.regex.length });
-  };
-
   if (IOF_MODES[commonRoute] === undefined) unsupported.push({ route: commonRoute, ores: ["(common logic)"] });
   else {
-    // A config that routes ores onto the common chain explicitly (the wiki
-    // sorting lists every ore) defines that mode's membership outright, so
-    // its card is the positive list — an unlisted ore then matches no card
-    // and stays in storage instead of riding a catch-all. Only a config
-    // with no explicit members keeps the catch-all card.
-    const members = ores
-      .filter(o => o.route === commonRoute || o.route === "common")
+    // Every ore not routed elsewhere belongs to the common mode, listed or
+    // not — so its ore/rawOre filter is a catch-all excluding the ores
+    // routed to other modes, Do-not-process, or IOF-unsupported chains.
+    const excluded = ores
+      .filter(o => o.route !== commonRoute && o.route !== "common")
       .map(o => o.en);
-    if (members.length) {
-      pushMemberCard(IOF_MODES[commonRoute], commonRoute, members);
-    } else {
-      const exclGroups = groupOrder.map(route => route === "common"
-        ? []
-        : ores.filter(o => o.route === route && o.route !== commonRoute).map(o => o.en));
-      pushCatchAllCard(IOF_MODES[commonRoute], commonRoute, { form: "oreRaw", common: true, exclGroups });
+    for (const seg of letterSplitCatchAll(excluded, namespace, limit)) {
+      cards.push({ machine: "iof", mode: IOF_MODES[commonRoute], route: commonRoute,
+        segments: [seg], regex: seg.regex, length: seg.regex.length });
+    }
+    // Intermediates have no catch-all: listed common-mode ores keep a
+    // member card for them so bee products still find their machine.
+    if (opts.strayIntermediates) {
+      const members = ores
+        .filter(o => o.route === commonRoute || o.route === "common")
+        .map(o => o.en);
+      if (members.length) {
+        const forms = IOF_MODE_FORMS[commonRoute].filter(f => f !== "oreRaw");
+        const seg = { form: forms[0], forms, common: false, only: members };
+        seg.regex = segmentRegex(seg, namespace);
+        packCards("iof", [seg], namespace, limit).forEach(card => {
+          cards.push({ ...card, mode: IOF_MODES[commonRoute], route: commonRoute });
+        });
+      }
     }
   }
 
@@ -453,7 +457,98 @@ export function generateIOF(config, namespace, opts = {}) {
     if (IOF_MODES[route] === undefined) { unsupported.push({ route, ores: members }); continue; }
     pushMemberCard(IOF_MODES[route], route, members);
   }
+  const perMode = new Map();
+  for (const c of cards) perMode.set(c.mode, (perMode.get(c.mode) || 0) + 1);
+  const seen = new Map();
+  for (const c of cards) {
+    const i = (seen.get(c.mode) || 0) + 1;
+    seen.set(c.mode, i);
+    c.part = perMode.get(c.mode) > 1 ? `${i}/${perMode.get(c.mode)}` : undefined;
+  }
   return { cards, unsupported };
+}
+
+// ---- IOF common-mode catch-all, split by material initial ----
+// A negative-lookahead catch-all cannot be split by members (each half would
+// admit the other half's exclusions), so it splits by the material's first
+// letter instead: card k matches only materials starting in its letter range
+// and so only needs that range's exclusions.
+//
+// Stone variants make "the material's first letter" ambiguous — in
+// oreMoonIlmenite an optional stone infix could be skipped and "Moon" read as
+// the material. The stone is therefore consumed atomically, via a capture
+// inside a lookahead plus a backreference: (?=(STONE(?=[A-Z])|))\1. Lookaheads
+// never backtrack, and the empty alternative keeps group 1 participating (a
+// Java backreference to a non-participating group fails). Identical in Java
+// (the in-game filters) and JavaScript (this site and its tests).
+//
+// A material that itself begins with a stone name followed by a capital
+// (CallistoIce) parses as the remainder ("Ice"), so an excluded one is listed
+// under both readings.
+function stoneParse(name) {
+  for (const stone of ["Small", ...STONE_INFIXES]) {
+    if (name.length > stone.length && name.startsWith(stone) && /[A-Z]/.test(name[stone.length])) {
+      return name.slice(stone.length);
+    }
+  }
+  return name;
+}
+
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const CONSUME_STONE = `(?=((?:Small|${STONE_INFIXES.join("|")})(?=[A-Z])|))\\1`;
+
+function letterSplitCatchAll(excluded, namespace, limit) {
+  // Strings that can follow the consumed stone: every material as written,
+  // plus the remainder reading of stone-prefixed ones.
+  const parsedNs = [...new Set([...namespace, ...namespace.map(stoneParse)])];
+  const entries = [];
+  for (const en of excluded) {
+    entries.push({ en, key: en });
+    const parsed = stoneParse(en);
+    if (parsed !== en) entries.push({ en, key: parsed });
+  }
+  const fullSet = new Set(entries.map(e => e.key));
+
+  const build = (lo, hi) => {
+    const range = lo === hi ? LETTERS[lo] : `${LETTERS[lo]}-${LETTERS[hi]}`;
+    const inRange = entries.filter(e => {
+      const i = LETTERS.indexOf(e.key[0].toUpperCase());
+      return i >= lo && i <= hi;
+    });
+    const keys = [...new Set(inRange.map(e => e.key))];
+    const veto = keys.length ? `(?!${alternation([keys], parsedNs, fullSet)}$)` : "";
+    const regex = `^${FORMS.oreRaw.re}${CONSUME_STONE}${veto}[${range}].*$`;
+    return {
+      form: "oreRaw", common: true, letterRange: range.replace("-", "\u2013"),
+      exclGroups: [[...new Set(inRange.map(e => e.en))]], regex,
+    };
+  };
+
+  // Fewest contiguous letter ranges whose cards all fit; among splits of that
+  // count, the one with the shortest longest card.
+  const n = LETTERS.length;
+  const splitsOf = (parts) => {
+    if (parts === 1) return [[]];
+    const out = [];
+    const rec = (start, left, acc) => {
+      if (left === 0) { out.push(acc); return; }
+      for (let c = start; c <= n - left; c++) rec(c + 1, left - 1, [...acc, c]);
+    };
+    rec(1, parts - 1, []);
+    return out;
+  };
+  for (let parts = 1; parts <= n; parts++) {
+    let best = null;
+    for (const cuts of splitsOf(parts)) {
+      const bounds = [0, ...cuts, n];
+      const segs = [];
+      for (let i = 0; i < parts; i++) segs.push(build(bounds[i], bounds[i + 1] - 1));
+      const worst = Math.max(...segs.map(s => s.regex.length));
+      if (worst <= limit && (!best || worst < best.worst)) best = { segs, worst };
+    }
+    if (best) return best.segs;
+  }
+  return [build(0, n - 1)];
 }
 
 // ---- Compound-dust decomposition cards ----

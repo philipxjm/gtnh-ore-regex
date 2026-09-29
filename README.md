@@ -55,14 +55,19 @@ cards. Untick the merge to drive a dedicated decomposition line instead. Routes
 with no centrifuge step have nothing to merge into and always get their own card.
 
 The **Integrated Ore Factory** mode emits one regex per IOF processing mode instead (matching `ore`/`rawOre` only,
-since the IOF runs the whole chain internally), with mode numbers matching the machine's screwdriver cycle. When
-the configuration routes ores onto the common chain explicitly (the default wiki sorting lists every ore), the
-common mode's card is a positive list too — an unlisted ore then matches no card and stays in storage instead of
-riding a catch-all. With stray intermediates on, each mode's filter also matches the intermediate forms that
-mode's step chain actually consumes (verified against `MTEIntegratedOreFactory`'s mode switch) — a bee-produced
-purified ore rides the same filter to the same machine and is finished mid-chain. Forms a mode cannot finish are
-left out: the sifter mode takes no dusts (no centrifuge step), the washer+centrifuge mode no centrifuged ore
-(no thermal step), so nothing idles through a machine unprocessed.
+since the IOF runs the whole chain internally), with mode numbers matching the machine's screwdriver cycle.
+The common mode uses **common logic**: its ore filter is a catch-all taking every ore not routed to another
+mode or to *Do not process* — including ores your list never mentions — so a new ore from a pack update
+still gets processed. A catch-all works by exclusion and so can't be split by members; instead it splits by
+the **material's first letter** (typically two filters, A–L and M–Z), each excluding only its own letters.
+Stone variants are handled by consuming the stone name atomically with a lookahead-captured backreference,
+`(?=((?:Small|Moon|…)(?=[A-Z])|))\1`, so `oreMoonIlmenite` is read as Ilmenite and can't be mistaken for a
+material starting with M; the construct behaves identically in Java (the in-game filters) and JavaScript.
+`node test/iof-coverage.mjs` checks all ~15,700 ore-form names per config land on exactly the right filter.
+With stray intermediates on, each mode's filter also matches the intermediate forms that mode's step chain
+actually consumes (verified against `MTEIntegratedOreFactory`'s mode switch) — a bee-produced purified ore
+rides the same filter to the same machine. Forms a mode cannot finish are left out: the sifter mode takes no
+dusts, the washer+centrifuge mode no centrifuged ore.
 
 ## Default configuration
 
@@ -90,7 +95,7 @@ IOF mode therefore yields exactly the wiki's four modes as four filter cards.
 ## Development
 
 No build step. `python3 -m http.server` (or any static server) in the repo root, then open `index.html`.
-Run the validation with `node test/validate.mjs`.
+Run the checks with `node test/validate.mjs`, `node test/stone-variants.mjs` and `node test/iof-coverage.mjs`.
 
 Ore and machine icons belong to their respective mods (GregTech, BartWorks, GT++, HardcoreEnderExpansion,
 Et Futurum Requiem, Minecraft); this is a non-commercial fan tool, not affiliated with the GTNH team or huijiwiki.

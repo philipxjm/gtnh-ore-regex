@@ -295,7 +295,11 @@ function renderOutputs() {
         icon: "machine_macerator.png",
         regex: card.regex,
         modeTag: "mode " + (card.mode + 1) + (card.part ? " · " + card.part : ""),
-        segments: card.segments.map(s => ({ ...s, formLabel: s.forms ? s.forms.map(f => FORM_LABELS[f]).join(" \u00b7 ") : FORM_LABELS[s.form] })),
+        segments: card.segments.map(s => ({
+          ...s,
+          formLabel: s.forms ? s.forms.map(f => FORM_LABELS[f]).join(" \u00b7 ")
+            : FORM_LABELS[s.form] + (s.letterRange ? " · materials " + s.letterRange : ""),
+        })),
       }, config));
     }
     for (const u of unsupported) {
