@@ -433,19 +433,13 @@ export function generateIOF(config, namespace, opts = {}) {
       cards.push({ machine: "iof", mode: IOF_MODES[commonRoute], route: commonRoute,
         segments: [seg], regex: seg.regex, length: seg.regex.length });
     }
-    // Intermediates have no catch-all: listed common-mode ores keep a
-    // member card for them so bee products still find their machine.
+    // Intermediates (bee products, manual inserts) get a catch-all too, so
+    // unlisted ores' crushed/dust forms also reach the common mode.
     if (opts.strayIntermediates) {
-      const members = ores
-        .filter(o => o.route === commonRoute || o.route === "common")
-        .map(o => o.en);
-      if (members.length) {
-        const forms = IOF_MODE_FORMS[commonRoute].filter(f => f !== "oreRaw");
-        const seg = { form: forms[0], forms, common: false, only: members };
-        seg.regex = segmentRegex(seg, namespace);
-        packCards("iof", [seg], namespace, limit).forEach(card => {
-          cards.push({ ...card, mode: IOF_MODES[commonRoute], route: commonRoute });
-        });
+      const seg = intermediateCatchAll(ores, commonRoute, namespace, limit);
+      if (seg) {
+        cards.push({ machine: "iof", mode: IOF_MODES[commonRoute], route: commonRoute,
+          segments: seg.segments, regex: seg.regex, length: seg.regex.length });
       }
     }
   }
@@ -492,6 +486,39 @@ function stoneParse(name) {
     }
   }
   return name;
+}
+
+// Common-mode catch-all for intermediate forms (no stone infix on these, so
+// no parsing needed). Preferred: exclude an ore from a form only when its own
+// mode's card takes that form — so e.g. dustPure of a sifter-mode ore (which
+// that mode cannot finish) falls through to the common mode. If that doesn't
+// fit one filter, fall back to excluding routed ores from every form.
+// Do-not-process ores are only withheld at the ore stage, as in regular mode;
+// ores on IOF-unsupported chains are withheld from every form.
+function intermediateCatchAll(ores, commonRoute, namespace, limit) {
+  const forms = IOF_MODE_FORMS[commonRoute].filter(f => f !== "oreRaw");
+  if (!forms.length) return null;
+  const routed = ores.filter(o => o.route !== commonRoute && o.route !== "common" && o.route !== "None");
+  const build = (exclFor) => {
+    // Group forms sharing an exclusion set into one composite segment.
+    const groups = new Map();
+    for (const f of forms) {
+      const excl = routed.filter(o => exclFor(o, f)).map(o => o.en).sort();
+      const key = excl.join("|");
+      if (!groups.has(key)) groups.set(key, { forms: [], excl });
+      groups.get(key).forms.push(f);
+    }
+    const segments = [...groups.values()].map(({ forms: fs, excl }) => {
+      const alt = fs.map(f => FORMS[f].re + (FORMS[f].guard || "")).join("|");
+      const veto = excl.length ? `(?!${alternation([excl], namespace)}$)` : "";
+      return { form: fs[0], forms: fs, common: true, exclGroups: [excl],
+        regex: `^(?:${alt})${veto}[A-Z].*$` };
+    });
+    return { segments, regex: segments.map(sg => sg.regex).join("|") };
+  };
+  const perForm = build((o, f) => IOF_MODES[o.route] === undefined || IOF_MODE_FORMS[o.route].includes(f));
+  if (perForm.regex.length <= limit) return perForm;
+  return build(() => true);
 }
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";

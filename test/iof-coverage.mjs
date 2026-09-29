@@ -3,9 +3,22 @@
 // materials the config has never heard of) must be claimed by exactly the
 // IOF card its route says — the common mode for listed-common AND unlisted
 // ores, nobody for Do-not-process / unsupported chains — and no filter may
-// exceed the length limit.
+// exceed the length limit. With stray intermediates on, the same holds for
+// every crushed/purified/centrifuged/impure/pure form of every material.
 import { NAMESPACE, DEFAULT_ORES } from "../js/data.js";
 import { generateIOF, IOF_MODES, STONE_INFIXES } from "../js/generator.js";
+
+// Intermediate forms each IOF mode's chain consumes (MTEIntegratedOreFactory).
+const MODE_FORMS = {
+  MPTM: ["crushed", "crushedPurified", "crushedCentrifuged"],
+  MPMC: ["crushed", "crushedPurified", "dustImpure", "dustPure"],
+  MMC: ["crushed", "crushedPurified", "crushedCentrifuged", "dustImpure", "dustPure"],
+  MPS: ["crushed", "crushedPurified"],
+  MBMC: ["crushed", "crushedPurified", "dustImpure", "dustPure"],
+  MBTM: ["crushed", "crushedPurified", "crushedCentrifuged"],
+  HHW: ["crushed", "crushedPurified", "crushedCentrifuged", "dustImpure", "dustPure"],
+};
+const INTERMEDIATES = ["crushed", "crushedPurified", "crushedCentrifuged", "dustImpure", "dustPure"];
 
 let fail = 0;
 const check = (label, cond, detail = "") => {
@@ -23,6 +36,44 @@ function expectedModes(config, material, small) {
   // Small ores are never positively routed; only the catch-all takes them.
   if (small && route !== config.commonRoute) return [];
   return [IOF_MODES[route]];
+}
+
+// Who should take an intermediate form of a material (stray intermediates on).
+// perForm: whether the common catch-all withholds an ore only from the forms
+// its own mode takes (else it withholds routed ores from every form).
+function expectedIntermediate(config, material, form, perForm) {
+  const o = config.ores.find(x => x.en === material);
+  const route = o ? (o.route === "common" ? config.commonRoute : o.route) : config.commonRoute;
+  const common = IOF_MODES[config.commonRoute];
+  const commonTakes = MODE_FORMS[config.commonRoute].includes(form);
+  if (route === "None") return commonTakes ? [common] : [];
+  if (IOF_MODES[route] === undefined) return [];
+  if (route === config.commonRoute) return commonTakes ? [common] : [];
+  if (MODE_FORMS[route].includes(form)) return [IOF_MODES[route]];
+  return perForm && commonTakes ? [common] : [];
+}
+
+function auditIntermediates(label, config) {
+  const { cards } = generateIOF(config, NAMESPACE, { strayIntermediates: true });
+  const compiled = cards.map(c => ({ mode: c.mode, re: new RegExp(c.regex) }));
+  const inter = cards.find(c => c.segments.some(s => s.common && s.forms));
+  const perForm = inter ? inter.segments.length > 1 : false;
+  check(`${label}: intermediate catch-all present (${perForm ? "per-form" : "simple"}, ${inter?.length} chars)`, !!inter);
+  const wrong = [];
+  let names = 0;
+  for (const m of [...NAMESPACE, ...UNKNOWN]) {
+    for (const f of INTERMEDIATES) {
+      names++;
+      const name = f + m;
+      const got = compiled.filter(c => c.re.test(name)).map(c => c.mode).sort();
+      const want = expectedIntermediate(config, m, f, perForm);
+      if (got.join() !== want.join()) wrong.push(`${name}: got [${got}] want [${want}]`);
+    }
+  }
+  check(`${label}: ${names} intermediate names owned correctly (wrong: ${wrong.length})`, wrong.length === 0,
+    wrong.slice(0, 8).join("\n     "));
+  const mode3 = cards.filter(c => c.route === config.commonRoute).length;
+  check(`${label}: common mode in <= 3 filters (${mode3})`, mode3 <= 3);
 }
 
 function audit(label, config, opts = {}) {
@@ -65,6 +116,14 @@ audit("with MTM ores", { ...base, ores: base.ores.map(o =>
 
 // Old-style link: nothing listed on the common route.
 audit("sparse config", { commonRoute: "MMC", ores: [
+  { en: "Ilmenite", route: "None" }, { en: "Galena", route: "MPMC" },
+  { en: "CallistoIce", route: "MPMC" }, { en: "Diamond", route: "MPS" } ] });
+
+auditIntermediates("defaults", base);
+auditIntermediates("defaults minus 6", { ...base, ores: base.ores.filter(o => !dropped.includes(o.en)) });
+auditIntermediates("with MTM ores", { ...base, ores: base.ores.map(o =>
+  ["Chalcopyrite", "Pyrochlore"].includes(o.en) ? { ...o, route: "MTM" } : o) });
+auditIntermediates("sparse config", { commonRoute: "MMC", ores: [
   { en: "Ilmenite", route: "None" }, { en: "Galena", route: "MPMC" },
   { en: "CallistoIce", route: "MPMC" }, { en: "Diamond", route: "MPS" } ] });
 

@@ -67,7 +67,11 @@ material starting with M; the construct behaves identically in Java (the in-game
 With stray intermediates on, each mode's filter also matches the intermediate forms that mode's step chain
 actually consumes (verified against `MTEIntegratedOreFactory`'s mode switch) — a bee-produced purified ore
 rides the same filter to the same machine. Forms a mode cannot finish are left out: the sifter mode takes no
-dusts, the washer+centrifuge mode no centrifuged ore.
+dusts, the washer+centrifuge mode no centrifuged ore. The common mode gets an intermediates catch-all too, so
+unlisted ores' crushed and dust forms are processed as well. When it fits one filter it withholds an ore only
+from the forms its own mode takes, so e.g. a sifter-mode ore's stray dust falls through to the common mode;
+otherwise it withholds routed ores from every intermediate form. As in regular mode, *Do not process* only
+withholds the ore itself — a stray intermediate of such an ore goes to the common mode.
 
 ## Default configuration
 
